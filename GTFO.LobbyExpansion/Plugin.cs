@@ -9,8 +9,12 @@ using HarmonyLib;
 namespace GTFO.LobbyExpansion;
 
 [BepInPlugin(PluginInfo.Guid, PluginInfo.Name, PluginInfo.Version)]
+[BepInDependency(LocaliaCorePatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(ChatterRebornPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(PacksHelperPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(ZombifiedInitiativePatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(PlayerSyncPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(ModListPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 public class Plugin : BasePlugin
 {
     private Harmony _harmony = null!;
@@ -142,7 +146,11 @@ public class Plugin : BasePlugin
         var modCompatibilityPatches = new List<ModCompatibilityPatch>()
         {
             new PacksHelperPatch(),
-            ChatterRebornPatch.Instance
+            LocaliaCorePatch.Instance,
+            ChatterRebornPatch.Instance,
+            ZombifiedInitiativePatch.Instance,
+            PlayerSyncPatch.Instance,
+            ModListPatch.Instance,
         };
 
         foreach (var patch in modCompatibilityPatches)
@@ -154,7 +162,7 @@ public class Plugin : BasePlugin
                 if (!patch.ShouldApply())
                 {
                     L.Verbose($"Skipping initialization of {patchName} since the patch deemed it shouldn't be applied.");
-                    return;
+                    continue; // Don't skip other patches on the list using return when one failed
                 }
 
                 L.Info($"Applying mod compatibility patch {patchName}.");
@@ -164,7 +172,7 @@ public class Plugin : BasePlugin
             {
                 L.Fatal($"An error occurred while applying mod compatibility patch {patchName}:");
                 L.Fatal(e);
-                return;
+                continue; //previously skip others on the list
             }
         }
 
