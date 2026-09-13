@@ -11,7 +11,7 @@ public class PingConsumablesPatch : ModCompatibilityPatch
 
     public static PingConsumablesPatch Instance { get; } = new();
 
-    // Substrings identifying the two specific recurring log lines to downgrade. Add more here
+    // Substrings identifying the two specific recurring log lines to suppress. Add more here
     // if other messages turn out to be similarly spammy - everything else stays untouched.
     private static readonly string[] SpammyMessageSubstrings =
     {
@@ -39,12 +39,12 @@ public class PingConsumablesPatch : ModCompatibilityPatch
         if (_loggerField is null)
             throw new Exception($"Unable to find {pluginType.FullName}.L; PingConsumables' internals may have changed.");
 
-        var logMethod = AccessTools.Method(typeof(ManualLogSource), nameof(ManualLogSource.Log), new[] { typeof(LogLevel), typeof(object) });
-        if (logMethod is null)
-            throw new Exception("Unable to find ManualLogSource.Log(LogLevel, object).");
+        var logEventMethod = AccessTools.Method(typeof(DiskLogListener), nameof(DiskLogListener.LogEvent));
+        if (logEventMethod is null)
+            throw new Exception("Unable to find DiskLogListener.LogEvent(object, LogEventArgs).");
 
-        var prefix = AccessTools.Method(typeof(PingConsumablesPatch), nameof(Log_Prefix));
-        harmony.Patch(logMethod, prefix: new HarmonyMethod(prefix));
+        var prefix = AccessTools.Method(typeof(PingConsumablesPatch), nameof(LogEvent_Prefix));
+        harmony.Patch(logEventMethod, prefix: new HarmonyMethod(prefix));
 
         L.Debug($"Applied patches in {nameof(PingConsumablesPatch)}.");
     }
@@ -52,25 +52,22 @@ public class PingConsumablesPatch : ModCompatibilityPatch
     #endregion
 
     [HarmonyWrapSafe]
-    private static bool Log_Prefix(ManualLogSource __instance, LogLevel level, object data)
+    private static bool LogEvent_Prefix(LogEventArgs eventArgs)
     {
-        if (level != LogLevel.Info)
-            return true; 
+        if (eventArgs.Level != LogLevel.Info)
+            return true; // only Info-level spam is the problem here
 
         var pingConsumablesLogger = (ManualLogSource?)Instance._loggerField!.GetValue(null);
-        if (!ReferenceEquals(__instance, pingConsumablesLogger))
-            return true; 
+        if (!ReferenceEquals(eventArgs.Source, pingConsumablesLogger))
+            return true; // not PingConsumables' logger - leave every other mod's logging alone
 
-        var text = data?.ToString() ?? "";
+        var text = eventArgs.Data?.ToString() ?? "";
         foreach (var substring in SpammyMessageSubstrings)
         {
-            if (!text.Contains(substring))
-                continue;
-
-            __instance.Log(LogLevel.Debug, data); 
-            return false; 
+            if (text.Contains(substring))
+                return false; // skip writing this line to the log file
         }
 
-        return true; 
+        return true; // everything else (cleanup notice, per-level setup summary) stays visible
     }
 }
