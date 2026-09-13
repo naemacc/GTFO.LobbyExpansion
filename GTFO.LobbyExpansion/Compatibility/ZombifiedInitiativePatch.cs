@@ -1,6 +1,7 @@
 using GTFO.LobbyExpansion.Util;
 using HarmonyLib;
 using Il2CppInterop.Runtime;
+using Il2CppInterop.Runtime.InteropTypes;
 using Player;
 using SNetwork;
 using System.Collections.Generic;
@@ -17,12 +18,11 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
     public static ZombifiedInitiativePatch Instance { get; } = new();
 
     private Type? _zombieCompType;
-
     private FieldInfo? _myselfField;
 
     // --- Sentry mode networking fix ---
-    private const int SentryModeFunc = 6; // ZombifiedInitiative's own ZINetInfo.FUNC uses 0-5; 6 is unused.
-    private const int AllBotsSlotSentinel = 8; // matches ZombifiedInitiative's own "AllBots" convention.
+    private const int SentryModeFunc = 6; // ZINetInfo.FUNC 0-5 are taken; 6 is unused.
+    private const int AllBotsSlotSentinel = 8; // Matches ZombifiedInitiative's "AllBots" convention.
 
     private Type? _zombifiedInitiativeType;
     private Type? _zinetInfoType;
@@ -64,8 +64,6 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
         }
         catch (Exception ex)
         {
-            // Non-fatal: the orphaned-ZombieComp fix above still works either way. Sentry mode
-            // just goes back to being host-only if this fails.
             L.Error($"{nameof(ZombifiedInitiativePatch)}: sentry mode networking fix failed, sentry mode will remain host-only: {ex}");
         }
     }
@@ -74,7 +72,6 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
 
     protected void ApplyPatches(Harmony harmony)
     {
-        // Patched manually since we don't have a reference to the ZombieComp type at compile time.
         var original = AccessTools.Method(_zombieCompType, "Update") ?? throw new Exception($"Unable to find {nameof(_zombieCompType)}::Update().");
         var prefix = AccessTools.Method(typeof(ZombifiedInitiativePatch), nameof(ZombieComp__Update__Prefix));
         harmony.Patch(original, prefix: new HarmonyMethod(prefix));
@@ -85,43 +82,26 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
     [HarmonyWrapSafe]
     private static bool ZombieComp__Update__Prefix(object __instance)
     {
-        if (Instance._zombieCompType is null)
-        {
-            L.Error($"Update prefix can't run; {nameof(_zombieCompType)} is null.");
-            return true; 
-        }
+        if (Instance._zombieCompType is null) return true; 
 
-        if (!Instance._zombieCompType.IsInstanceOfType(__instance))
-        {
-            L.Error(
-                $"Update prefix was passed an instance that is NOT an instance of {nameof(_zombieCompType)} type? It was of type {__instance.GetType().FullName}");
-            return true;
-        }
+        if (!Instance._zombieCompType.IsInstanceOfType(__instance)) return true;
 
-        if (Instance._myselfField is null)
-        {
-            L.Error($"Update prefix can't run; {nameof(_myselfField)} is null.");
-            return true;
-        }
+        if (Instance._myselfField is null) return true;
 
         var myself = Instance._myselfField.GetValue(__instance);
 
-        // UnityEngine.Object overloads == to report true for destroyed native objects even
-        // when the managed reference isn't C# null, so we have to go through that operator.
+        // Safely check if the native Unity object was destroyed
         var isDestroyed = myself is null || (UnityEngine.Object)myself == null;
 
         if (!isDestroyed)
-            return true; // myself is still a live PlayerAgent, let the original Update() run
+            return true; 
 
-        // The PlayerAgent this bot's ZombieComp was attached to no longer exists. 
-        // Destroy the orphaned component instead of letting it NullReferenceException every frame forever.
         L.Warning("Destroying orphaned ZombieComp whose PlayerAgent no longer exists.");
         UnityEngine.Object.Destroy((UnityEngine.Object)__instance);
 
-        return false; // skip the original Update()
+        return false; 
     }
 
-    // Patched manually since ZombieComp/ZombifiedInitiative/ZINetInfo aren't referenced at compile time.
     private void ApplySentryModeNetworkingFix(Harmony harmony, Assembly zombifiedAssembly)
     {
         _zombifiedInitiativeType = ReflectionUtil.GetRequiredTypeByName("ZombifiedInitiative", zombifiedAssembly);
@@ -185,6 +165,23 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
             throw new Exception($"Unable to find {memberName}; ZombifiedInitiative's internals may have changed.");
     }
 
+    /// <summary>
+    /// Component.GetComponent returns a wrapper of type UnityEngine.Component.
+    /// FieldInfo.GetValue requires the exact C# type. We must TryCast via reflection.
+    /// </summary>
+    private static object? GetZombieComp(PlayerAIBot bot)
+    {
+        var component = ((UnityEngine.Component)bot).GetComponent(Il2CppType.From(Instance._zombieCompType!));
+        if (component is null)
+            return null;
+
+        var tryCast = typeof(Il2CppObjectBase)
+            .GetMethod("TryCast", BindingFlags.Public | BindingFlags.Instance)
+            ?.MakeGenericMethod(Instance._zombieCompType!);
+
+        return tryCast?.Invoke(component, null);
+    }
+
     private static Dictionary<string, bool> SnapshotAllowedMove()
     {
         var result = new Dictionary<string, bool>();
@@ -192,7 +189,7 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
 
         foreach (var (name, bot) in botTable)
         {
-            var zombieComp = ((UnityEngine.Component)bot).GetComponent(Il2CppType.From(Instance._zombieCompType!));
+            var zombieComp = GetZombieComp(bot);
             if (zombieComp is null)
                 continue;
 
@@ -208,9 +205,6 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
         _allowedMoveSnapshot = SnapshotAllowedMove();
     }
 
-    // Diffs allowedmove before/after the original ran. Any bot whose flag changed just had
-    // sentry mode toggled locally by the original code - if we're the host that's already
-    // authoritative and nothing more is needed; if not, forward it so the host actually acts on it.
     [HarmonyWrapSafe]
     private static void PlayConfirmSound_Postfix()
     {
@@ -225,7 +219,7 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
         foreach (var (botName, wasAllowed) in before)
         {
             if (!after.TryGetValue(botName, out var isAllowedNow) || isAllowedNow == wasAllowed)
-                continue; // this bot's sentry state wasn't touched by whatever command just ran
+                continue; 
 
             if (!botTable.TryGetValue(botName, out var bot))
                 continue;
@@ -235,9 +229,7 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
         }
     }
 
-    // `sender` is unused but must keep this exact name: Harmony matches postfix parameters to
-    // the original method's parameters by name, and the original is
-    // ReceiveZINetInfo(ulong sender, ZombifiedInitiative.ZINetInfo netInfo).
+    // `sender` is unused but must keep this exact name so Harmony can bind it to the original method signature.
 #pragma warning disable IDE0060
     [HarmonyWrapSafe]
     private static void ReceiveZINetInfo_Postfix(ulong sender, object netInfo)
@@ -265,7 +257,7 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
 
     private static void ToggleSentryMode(PlayerAIBot bot)
     {
-        var zombieComp = ((UnityEngine.Component)bot).GetComponent(Il2CppType.From(Instance._zombieCompType!));
+        var zombieComp = GetZombieComp(bot);
         if (zombieComp is null)
             return;
 
@@ -273,9 +265,8 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
         Instance._allowedMoveField.SetValue(zombieComp, newValue);
 
         if (!newValue)
-            return; // sentry mode just turned ON - nothing further to reset
+            return; 
 
-        // Mirrors the original code's own DescBase.Status = 0 reset.
         var followAction = (PlayerBotActionBase?)Instance._followActionField!.GetValue(zombieComp);
         var travelAction = (PlayerBotActionBase?)Instance._travelActionField!.GetValue(zombieComp);
 
