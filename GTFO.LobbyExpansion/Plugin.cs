@@ -15,6 +15,7 @@ namespace GTFO.LobbyExpansion;
 [BepInDependency(ZombifiedInitiativePatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(PlayerSyncPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(ModListPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(PingConsumablesPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 public class Plugin : BasePlugin
 {
     private Harmony _harmony = null!;
@@ -151,6 +152,7 @@ public class Plugin : BasePlugin
             ZombifiedInitiativePatch.Instance,
             PlayerSyncPatch.Instance,
             ModListPatch.Instance,
+            PingConsumablesPatch.Instance,
         };
 
         foreach (var patch in modCompatibilityPatches)
@@ -172,7 +174,7 @@ public class Plugin : BasePlugin
             {
                 L.Fatal($"An error occurred while applying mod compatibility patch {patchName}:");
                 L.Fatal(e);
-                continue; //previously skip others on the list
+                continue; //previously skip other on the list
             }
         }
 
