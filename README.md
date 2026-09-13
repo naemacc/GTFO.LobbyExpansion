@@ -29,7 +29,7 @@ This fork introduces several new Harmony patches to support lobbies with 5+ play
   * Expanded the `UI_ModButtons` array initialization to support `MaxPlayers`.
   * Added safe IL transpilers to replace hardcoded loop bounds in `GenerateLobbyButtons`, `checkSlotState`, and `ClearButtonText` with a dynamic cap. This ensures players 5+ properly receive their mod-sync UI labels on the lobby screen.
 * **PingConsumables Compatibility**
-  * Patched BepInEx's `ManualLogSource.Log` specifically scoped to PingConsumables' own logger instance. Downgrades spammy recurring housekeeping logs (from `MovePickups` and `RemoveConsumablesFromTerminal` coroutines) to Debug level, keeping the console clean without breaking the mod's useful one-time initialization info logs.
+  * Patched BepInEx's `DiskLogListener.LogEvent` specifically scoped to PingConsumables' own logger instance. Safely intercepts and suppresses spammy recurring housekeeping logs (from `MovePickups` and `RemoveConsumablesFromTerminal` coroutines) before they write to the disk, keeping the console log clean without breaking the mod's useful one-time initialization info logs.
 * **PlayerSync Compatibility**
   * Added a null check guard for StaminaSync packets. Drops packets safely if the sender is null (e.g., when a packet is in-flight for a player mid-leave/rejoin), mirroring existing behavior in AmmoSync and preventing native-to-managed trampoline crashes.
 * **ZombifiedInitiative Compatibility**
