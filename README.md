@@ -1,6 +1,6 @@
 # GTFO LobbyExpansion (Personalized Fork)
 
-> **⚠️ Notice:** The original repository for this mod appears to be dead/abandoned. This is **not** an official continuation or a new maintainer's revival, but rather a personalized fork created to keep the mod working smoothly alongside other popular community mods. 
+> **⚠️ Notice:** The original repository for this mod appears to be dead/abandoned. This is **not** an official continuation or a new maintainer's revival, but rather a personalized fork created to keep the mod working smoothly alongside other popular community mods.
 
 ### Branch Information
 * **`personalized` (Default):** Contains all the custom compatibility patches, bug fixes, and additions.
@@ -10,13 +10,15 @@
 
 ## 🛠️ What's New in This Fork?
 
-This fork introduces several new Harmony patches to support lobbies with 5+ players across various community mods, fixing hardcoded limits and preventing crashes. 
+This fork introduces several new Harmony patches to support lobbies with 5+ players across various community mods, fixing hardcoded limits and preventing crashes.
 
 ### 🐛 Fixes
 * **ChatterReborn Compatibility** *(Credit to Dinorush for a large part of the original fix)*
   * **Dynamic array sizing:** Replaces hardcoded loops (`for (int i = 0; i < 4; i++)`) to process all player slots correctly, preventing the mod from leaving stale detection/aggro scores behind for players 5+.
   * **Transpiler Fix:** Resolves an `IndexOutOfRangeException` when ordering a 5th+ player back to a bioscan by dynamically swapping `ldc.i4.4` to call `GetMaxPlayersAsInt()`.
   * **Error Handling & Fallbacks:** Exceptions during patch application now throw loudly instead of failing silently. Added late-initialization array fix-ups in case ChatterReborn's `Setup()` or `Awake()` runs before the patch applies.
+* **OptionalNetworkAPI Compatibility**
+  * **Stale Bot Entry Fix:** Resolves an `ArgumentException` loop that occurs when bots attempt to rejoin a lobby. If a bot's removal is interrupted by another mod's bug, OptionalNetworkAPI leaves a stale dictionary entry forever since bots don't trigger normal network disconnect events. The patch actively clears pre-existing dictionary entries for bots before `OnAddPlayer` runs.
 
 ### ✨ Additions
 * **ExtraObjectiveSetup / ECPC Compatibility** *(Salvaged from upstream PR #3)*

@@ -16,6 +16,7 @@ namespace GTFO.LobbyExpansion;
 [BepInDependency(PlayerSyncPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(ModListPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(PingConsumablesPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
+[BepInDependency(OptionalNetworkAPIPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 public class Plugin : BasePlugin
 {
     private Harmony _harmony = null!;
@@ -36,7 +37,6 @@ public class Plugin : BasePlugin
         try
         {
 #if DEBUG
-            // TODO: Remove this later, just helps find it easier in BepInEx console
             L.Warning("------------------------------------------------------");
             L.Warning("------------------------------------------------------");
             L.Warning("------------------------------------------------------");
@@ -107,7 +107,6 @@ public class Plugin : BasePlugin
         }
 
 #if DEBUG
-        // TODO: Remove this later, just helps find it easier in BepInEx console
         L.Warning("------------------------------------------------------");
         L.Warning("------------------------------------------------------");
         L.Warning("------------------------------------------------------");
@@ -132,7 +131,6 @@ public class Plugin : BasePlugin
         }
 
 #if DEBUG
-        // TODO: Remove this later, just helps find it easier in BepInEx console
         L.Warning("------------------------------------------------------");
         L.Warning("------------------------------------------------------");
         L.Warning("------------------------------------------------------");
@@ -153,6 +151,7 @@ public class Plugin : BasePlugin
             PlayerSyncPatch.Instance,
             ModListPatch.Instance,
             PingConsumablesPatch.Instance,
+            OptionalNetworkAPIPatch.Instance,
         };
 
         foreach (var patch in modCompatibilityPatches)
@@ -164,7 +163,7 @@ public class Plugin : BasePlugin
                 if (!patch.ShouldApply())
                 {
                     L.Verbose($"Skipping initialization of {patchName} since the patch deemed it shouldn't be applied.");
-                    continue; // Don't skip other patches on the list using return when one failed
+                    continue;
                 }
 
                 L.Info($"Applying mod compatibility patch {patchName}.");
@@ -174,10 +173,11 @@ public class Plugin : BasePlugin
             {
                 L.Fatal($"An error occurred while applying mod compatibility patch {patchName}:");
                 L.Fatal(e);
-                continue; //previously skip other on the list
+                continue;
             }
         }
 
         L.Info($"Loaded plugin {PluginInfo.Name}.");
     }
 }
+
