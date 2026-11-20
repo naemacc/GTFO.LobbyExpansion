@@ -6,6 +6,34 @@ using SNetwork;
 
 namespace GTFO.LobbyExpansion.Compatibility;
 
+/**
+ * LocaliaCore.Network_Manager stores all per-player networking state (slot lookups, mod-list
+ * sync, heartbeat/ping tracking) in static arrays hardcoded to length 4:
+ *
+ *   public static ulong[] slot_lookup = new ulong[4];
+ *   public static SNet_Player[] slot_SNet = new SNet_Player[4];
+ *   ... (13 more, all `new X[4]`)
+ *
+ * indexed throughout by `player.PlayerSlotIndex()`. In a 5+ player lobby this throws
+ * IndexOutOfRangeException from Patch_AddToPlayersInGame, Patch_RemoveFromPlayersInGame,
+ * Patch_RemovePlayerFromSession, and Patch_IncomingMapInteraction - and, worse, can leave
+ * SNet_Player <-> slot-index bookkeeping in other mods (e.g. ChatterReborn's CharacterID-indexed
+ * dialogue arrays) reading/writing the wrong slot, since those all ultimately depend on the same
+ * underlying player-slot assignment machinery this corrupts.
+ *
+ * On top of the array sizes, a handful of methods have their own hardcoded `4` loop bound /
+ * range check, which would silently continue to ignore players 5+ even once the arrays above
+ * are big enough to not crash:
+ *   - LocaliaCore_Moniter.FixedUpdate() loops slots 0..3 to track ping/heartbeat/mod-list state.
+ *   - Network_Manager.outLobbyClear() loops slots 0..3 to reset state between lobbies (if left
+ *     unfixed, slots 4+ would carry stale data across lobby transitions).
+ *   - API.is_Valid_Human / API.has_got_modlist bound-check `slot < 4`.
+ *   - API.has_Everyone_Install_Plugin loops slots 0..3.
+ * These aren't crash bugs on their own, but API.has_Everyone_Install_Core /
+ * has_Everyone_Got_Modlist (and anything another mod builds on top of LocaliaCore's public API)
+ * would be silently wrong for lobbies bigger than 4, so they're fixed here too rather than left
+ * as a "doesn't crash, good enough" gap.
+ */
 public class LocaliaCorePatch : ModCompatibilityPatch
 {
     public const string PluginGuid = "Localia.LocaliaCore";
@@ -62,7 +90,7 @@ public class LocaliaCorePatch : ModCompatibilityPatch
     private MethodInfo? _isValidHumanMethod;
     private MethodInfo? _hasInstallPluginMethod;
 
-    // Logs members.
+    // Logs (internal class, but reflection doesn't care about that).
     private MethodInfo? _logsErrorMethod;
     private MethodInfo? _logsVerboseMethod;
 

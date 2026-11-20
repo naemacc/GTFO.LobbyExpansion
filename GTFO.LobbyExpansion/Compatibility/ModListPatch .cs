@@ -5,6 +5,43 @@ using HarmonyLib;
 
 namespace GTFO.LobbyExpansion.Compatibility;
 
+/**
+ * ModList.ModList_Manager mirrors LocaliaCore's per-slot mod-sync status ("MOD: SYNCED",
+ * "MOD: GETTING...", "MOD: UNKNOWN") as little text overlays on each player's lobby bar.
+ * It hardcodes this to 4 players in four places:
+ *
+ *   public static CM_Item[] UI_ModButtons = new CM_Item[4];
+ *
+ *   GenerateLobbyButtons() { for (int i = 0; i < 4; i++) { UI_ModButtons[i] = ...; ... } }
+ *   checkSlotState()       { for (int i = 0; i < 4; i++) { ...UI_ModButtons[i].SetText(...); } }
+ *   ClearButtonText()      { for (int i = 0; i < 4; i++) { UI_ModButtons[i].SetText(...); } }
+ *
+ * GenerateLobbyButtons() never even creates a button object for PlayerLobbyBars[4+], so in an
+ * expanded lobby, players beyond the 4th simply never get a mod-sync label at all - not even
+ * "MOD: UNKNOWN" - since there's no UI_ModButtons entry there for checkSlotState()/
+ * ClearButtonText() to write into. This isn't a crash bug (nothing throws), it's a silent
+ * feature gap: confirmed via screenshot showing page 2 of a 6-player lobby with no mod-sync
+ * text over any player, while page 1's four players show it correctly.
+ *
+ * The fix resizes UI_ModButtons and replaces the loop's `4` with
+ * Math.Min(PluginConfig.MaxPlayers, PlayerLobbyBars.Length) via transpiler. Confirmed in-game
+ * (logged diagnostic, since removed) that PlayerLobbyBars.Length actually equals
+ * PluginConfig.MaxPlayers, so this reaches every real player slot. The Math.Min clamp is kept
+ * regardless, as cheap insurance against PlayerLobbyBars.Length ever legitimately differing.
+ *
+ * IMPORTANT: the transpiler only replaces the `ldc.i4.4` that is part of the loop's own
+ * condition check (matched by the surrounding ldloc/compare pattern), not every `ldc.i4.4` in
+ * the method. GenerateLobbyButtons() also calls
+ * PageLoadout.m_guiLayer.AddRectComp(..., GuiAnchor.MidLeft, ...) inside the same loop; if that
+ * enum's underlying value also happens to compile to `ldc.i4.4`, a blind opcode-only replace
+ * would silently corrupt that argument on every iteration instead of just extending the loop -
+ * which is exactly what happened in an earlier version of this patch (confirmed by A/B test:
+ * removing this patch restored the ability to click "MOD: SYNCED" to open the mod list popup;
+ * re-adding it broke clicking for every player, not just the newly-covered ones - consistent
+ * with a per-iteration argument getting corrupted rather than the loop bound itself). If the
+ * expected ldloc/ldc.i4.4/compare pattern isn't found exactly once, this throws rather than
+ * guessing, since ModList's compiled IL could change between versions.
+ */
 public class ModListPatch : ModCompatibilityPatch
 {
     public const string PluginGuid = "Localia.ModList";
@@ -80,8 +117,14 @@ public class ModListPatch : ModCompatibilityPatch
         harmony.Patch(original, transpiler: transpiler);
     }
 
-    /// Replaces ONLY the `ldc.i4.4` that is part of the loop's condition check.
-    /// Matched by requiring it to sit between a load of the loop counter and a comparison/branch opcode.
+    /// Replaces ONLY the `ldc.i4.4` that is part of the loop's own condition check - matched by
+    /// requiring it to sit between a load of the loop counter and a comparison/branch opcode
+    /// (the standard shape the C# compiler emits for `for (int i = 0; i < 4; i++)`, including
+    /// the extra `clt`/`stloc`/`ldloc`/`brtrue` steps Debug builds add - ModList.dll is a Debug
+    /// build per its AssemblyInfo). Any other `ldc.i4.4` in the method (e.g. an enum constant
+    /// used as a call argument) is left completely alone. Throws if the pattern isn't found
+    /// exactly once rather than silently doing nothing or guessing wrong, since a codegen shape
+    /// we don't expect is exactly what caused the original bug this replaces.
     [HarmonyWrapSafe]
     private static IEnumerable<CodeInstruction> HardcodedFour_Transpiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -106,8 +149,11 @@ public class ModListPatch : ModCompatibilityPatch
                 "ModList's compiled IL may have changed - refusing to guess which constant is the loop bound.");
         }
 
-        // Mutate in place rather than replace the object to preserve the instruction's identity,
-        // which HarmonyX tracks jump targets by separately from .labels contents.
+        // Mutate in place rather than replace the object - preserves the instruction's identity,
+        // which HarmonyX's bake step can track jump targets by separately from .labels contents.
+        // This happened to work as a straight replacement in testing, but ChatterRebornPatch hit
+        // exactly this bug on a different method in the same run ("Bad label content in
+        // ILGenerator"), so hardening this one defensively rather than relying on luck.
         var target = codes[matchIndices[0]];
         target.opcode = OpCodes.Call;
         target.operand = getLoopBound;

@@ -37,6 +37,7 @@ public class Plugin : BasePlugin
         try
         {
 #if DEBUG
+            // TODO: Remove this later, just helps find it easier in BepInEx console
             L.Warning("------------------------------------------------------");
             L.Warning("------------------------------------------------------");
             L.Warning("------------------------------------------------------");
@@ -107,6 +108,7 @@ public class Plugin : BasePlugin
         }
 
 #if DEBUG
+        // TODO: Remove this later, just helps find it easier in BepInEx console
         L.Warning("------------------------------------------------------");
         L.Warning("------------------------------------------------------");
         L.Warning("------------------------------------------------------");
@@ -131,6 +133,7 @@ public class Plugin : BasePlugin
         }
 
 #if DEBUG
+        // TODO: Remove this later, just helps find it easier in BepInEx console
         L.Warning("------------------------------------------------------");
         L.Warning("------------------------------------------------------");
         L.Warning("------------------------------------------------------");
@@ -163,7 +166,7 @@ public class Plugin : BasePlugin
                 if (!patch.ShouldApply())
                 {
                     L.Verbose($"Skipping initialization of {patchName} since the patch deemed it shouldn't be applied.");
-                    continue;
+                    continue; // Don't skip other patch on the list using return
                 }
 
                 L.Info($"Applying mod compatibility patch {patchName}.");
@@ -173,11 +176,10 @@ public class Plugin : BasePlugin
             {
                 L.Fatal($"An error occurred while applying mod compatibility patch {patchName}:");
                 L.Fatal(e);
-                continue;
+                continue; //previously skip other on the list
             }
         }
 
         L.Info($"Loaded plugin {PluginInfo.Name}.");
     }
 }
-
