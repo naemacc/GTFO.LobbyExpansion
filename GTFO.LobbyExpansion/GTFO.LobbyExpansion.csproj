@@ -58,7 +58,7 @@
 		<Reference Remove="$(InteropFolder)/netstandard.dll" />
 
 		<!-- Uncomment if using GTFO-API in the plugin. -->
-		<!-- <Reference Include="$(PluginsFolder)/GTFO-API.dll" Private="false" /> -->
+		<Reference Include="$(PluginsFolder)/GTFO-API.dll" Private="false" /> 
 	</ItemGroup>
 
 <!--	<ItemGroup>-->

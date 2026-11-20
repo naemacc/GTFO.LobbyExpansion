@@ -1,4 +1,4 @@
-// Credit to Dinorush for a large part of the initial fix.
+// Credit to Dinorush for a large part of the original fix.
 
 using System.Collections.Generic;
 using System.Reflection;
@@ -67,10 +67,16 @@ public class ChatterRebornPatch : ModCompatibilityPatch
         }
         catch (Exception ex)
         {
+            // Loud on purpose: a silent failure here previously meant NONE of these patches
+            // were ever registered, with no indication of why in the log.
             L.Error($"{nameof(ChatterRebornPatch)}.Apply() failed: {ex}");
             throw;
         }
 
+        // Belt-and-suspenders: if, for whatever reason, ChatterReborn's Setup() already ran
+        // before we got here (Setup() only ever runs once per process, so our postfix would
+        // never get a chance to fire), fix the already-allocated arrays immediately too.
+        // This is safe to run unconditionally - SetValue doesn't care what the old value was.
         try
         {
             var dramaChatterManager = _dramaChatterManagerCurrentProperty!.GetValue(null);
@@ -86,6 +92,7 @@ public class ChatterRebornPatch : ModCompatibilityPatch
             L.Error($"{nameof(ChatterRebornPatch)}: immediate array fix-up failed (non-fatal, the Setup() postfixes are still active): {ex}");
         }
 
+        // Catch any EnemyDramaBehavior that already Awake()'d before this patch applied.
         try
         {
             var il2cppType = Il2CppType.From(_enemyDramaBehaviorType);
@@ -171,6 +178,7 @@ public class ChatterRebornPatch : ModCompatibilityPatch
         PatchTranspiler(harmony, _dramaChatterBaseType, "OnOrderBackToBioScanPrisoner", nameof(OnOrderBackToBioScanPrisoner_Transpiler));
     }
 
+    // Patched manually since we don't have compile-time references to ChatterReborn's types.
     private static void PatchTranspiler(Harmony harmony, Type? targetType, string methodName, string transpilerName)
     {
         var original = AccessTools.Method(targetType, methodName);
@@ -181,6 +189,7 @@ public class ChatterRebornPatch : ModCompatibilityPatch
         harmony.Patch(original, transpiler: transpiler);
     }
 
+    // Patched manually since we don't have compile-time references to ChatterReborn's types.
     private static void PatchMethod(Harmony harmony, Type? targetType, string methodName, string? prefix = null, string? postfix = null)
     {
         var original = AccessTools.Method(targetType, methodName);
@@ -206,18 +215,22 @@ public class ChatterRebornPatch : ModCompatibilityPatch
         _m_enemyVisibilitesField!.SetValue(detectionManagerInstance, new int[PluginConfig.MaxPlayers]);
     }
 
+    // Runs immediately after ChatterReborn's own DramaChatterManager.Setup(), whenever that
+    // happens to fire - no dependency on StartMainGame.Start ordering.
     [HarmonyWrapSafe]
     private static void DramaChatterManager_Setup_Postfix(object __instance)
     {
         Instance.ExpandDramaChatterManager(__instance);
     }
 
+    // Runs immediately after ChatterReborn's own EnemyDetectionManager.Setup().
     [HarmonyWrapSafe]
     private static void EnemyDetectionManager_Setup_Postfix(object __instance)
     {
         Instance.ExpandEnemyDetectionManager(__instance);
     }
 
+    // Runs immediately after every EnemyDramaBehavior.Awake() - i.e. every enemy spawn.
     [HarmonyWrapSafe]
     private static void EnemyDramaBehavior__Awake__Postfix(object __instance)
     {
@@ -229,7 +242,8 @@ public class ChatterRebornPatch : ModCompatibilityPatch
 
         if (!Instance._enemyDramaBehaviorType.IsInstanceOfType(__instance))
         {
-            L.Error($"Awake postfix was passed an instance that is NOT an instance of {nameof(_enemyDramaBehaviorType)} type? It was of type {__instance.GetType().FullName}");
+            L.Error(
+                $"Awake postfix was passed an instance that is NOT an instance of {nameof(_enemyDramaBehaviorType)} type? It was of type {__instance.GetType().FullName}");
             return;
         }
 
@@ -237,7 +251,10 @@ public class ChatterRebornPatch : ModCompatibilityPatch
         Instance._m_detectedPlayers!.SetValue(__instance, new bool[PluginConfig.MaxPlayers]);
     }
 
-    /// Replaces hardcoded 4-player loop to process all detected players safely.
+    /// Replaces the hardcoded "for (int i = 0; i < 4; i++)" found in
+    /// EnemyDramaBehavior.DisableEnemyDramaBehavior() in the decompiled ChatterReborn source.
+    /// With arrays now sized to MaxPlayers this no longer throws, but the hardcoded loop would
+    /// silently skip cleanup for player slots 4+, leaving stale detection/aggro scores behind.
     [HarmonyWrapSafe]
     private static bool DisableEnemyDramaBehavior_Prefix(object __instance)
     {
@@ -245,7 +262,7 @@ public class ChatterRebornPatch : ModCompatibilityPatch
 
         bool alreadyDestroyed = (bool)self._m_destroyedField!.GetValue(__instance)!;
         if (alreadyDestroyed)
-            return false;
+            return false; // Skip original; matches its own early-return behavior.
 
         self._m_destroyedField.SetValue(__instance, true);
 
@@ -278,10 +295,22 @@ public class ChatterRebornPatch : ModCompatibilityPatch
             }
         }
 
-        return false;
+        return false; // Skip the original's hardcoded-to-4 execution entirely.
     }
 
-    /// Replaces the hardcoded `new bool[4]` allocation inside OnOrderBackToBioScanPrisoner.
+    /// DRAMA_Chatter_Base.OnOrderBackToBioScanPrisoner() allocates `bool[] array = new bool[4]`
+    /// and indexes it by PlayerAgent.CharacterID (`array[val4.CharacterID] = true`), which throws
+    /// IndexOutOfRangeException for any player whose CharacterID is 4 or higher - i.e. any 5th+
+    /// player, in this dialogue path specifically (triggered when telling a straggler to get back
+    /// to a bioscan in progress). Unlike the other arrays here, this one is a local variable
+    /// declared inside the method body rather than a field set up in Setup()/Awake(), so there's
+    /// nothing to resize after the fact with a prefix/postfix - the fix has to happen at the IL
+    /// level. This transpiler replaces ONLY the `ldc.i4.4` immediately followed by `newarr` (the
+    /// exact shape of `new bool[4]`), not every `ldc.i4.4` in the method - a blind opcode-only
+    /// replace risks corrupting an unrelated constant elsewhere that happens to also compile to
+    /// ldc.i4.4 (an enum argument, for instance), which caused a real regression in ModListPatch
+    /// for exactly this reason. Throws if the pattern isn't found exactly once rather than
+    /// silently guessing wrong.
     [HarmonyWrapSafe]
     private static IEnumerable<CodeInstruction> OnOrderBackToBioScanPrisoner_Transpiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -302,7 +331,14 @@ public class ChatterRebornPatch : ModCompatibilityPatch
                 "ChatterReborn's compiled IL may have changed - refusing to guess which constant is the array size.");
         }
 
-        // Mutate in place to preserve Harmony jump targets/labels.
+        // Mutate the existing CodeInstruction object in place rather than replacing it - even
+        // with .labels/.blocks copied across, replacing the object changes its identity, and
+        // HarmonyX's bake step can track jump targets by that identity rather than purely by
+        // the .labels field contents. Keeping the same object is the textbook-correct pattern
+        // specifically to avoid "Bad label content in ILGenerator" when the replaced
+        // instruction happens to be a branch target - which is exactly what was happening here
+        // (ChatterReborn is a Debug build; the `ldc.i4.4` before `newarr` in
+        // OnOrderBackToBioScanPrisoner() turned out to be one).
         var target = codes[matchIndices[0]];
         target.opcode = OpCodes.Call;
         target.operand = getMaxPlayers;
