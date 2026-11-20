@@ -1,3 +1,10 @@
 *          text=auto
 *.cs       text diff=csharp
 *.csx      text diff=csharp
+
+# Merge strategy for specific files preventing pulling Build-14562266 old patches
+GTFO.LobbyExpansion/Patches/Manual/CM_PageExpeditionSuccessManualPatch.cs merge=ours
+GTFO.LobbyExpansion/Patches/Manual/CM_PageMapManualPatch.cs merge=ours
+GTFO.LobbyExpansion/Patches/Manual/PlayerAgentManualPatch.cs merge=ours
+GTFO.LobbyExpansion/Patches/Manual/PlayerManagerManualPatch.cs merge=ours
+GTFO.LobbyExpansion/Patches/Manual/SNet_PlayerSlotManagerManualPatch.cs merge=ours
