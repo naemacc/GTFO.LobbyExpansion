@@ -60,6 +60,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<Compile Remove="temp/**/*.cs" />
 		<Reference Include="$(BIECoreFolder)/0Harmony.dll" Private="false" />
 		<Reference Include="$(BIECoreFolder)/BepInEx.*.dll" Private="false" />
 		<Reference Include="$(BIECoreFolder)/Il2CppInterop*.dll" Private="false" />

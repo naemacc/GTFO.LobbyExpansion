@@ -397,6 +397,9 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
+# Decompiled decompiler reference files
+**/temp/
+
 # ---------------------------------------------------------------------------------------------------------------------
 
 .idea
