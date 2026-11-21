@@ -4,7 +4,6 @@ using GTFO.LobbyExpansion.Util;
 namespace GTFO.LobbyExpansion.Patches.Manual;
 
 #pragma warning disable S101
-
 public class CM_PageMapManualPatch : ManualPatch
 {
     protected override Type TargetType { get; } = typeof(CM_PageMap);
@@ -25,7 +24,7 @@ public class CM_PageMapManualPatch : ManualPatch
             {
                 Method = nameof(CM_PageMap.Setup),
                 Description = "Adjust CM_PageMap::Setup() m_inventory = new PUI_Inventory[4] to new max players.",
-                Pattern = "BA 04 00 00 00 E8 ?? ?? ?? ?? 4C 8D B7 38 02 00 00",
+                Pattern = "BA 04 00 00 00 E8 ?? ?? ?? ?? 4C 8D A7 38 02 00 00",
                 Offset = 1,
                 Bytes = [PluginConfig.MaxPlayers]
             },
@@ -73,7 +72,7 @@ public class CM_PageMapManualPatch : ManualPatch
             {
                 Method = nameof(CM_PageMap.CreatePlayerIcons),
                 Description = "Adjust CM_PageMap::CreatePlayerIcons() for (int i = 0; i < 4; i++) to new max players.",
-                Pattern = "83 FE 04 0F 8C A9 FC FF FF",
+                Pattern = "83 FE 04 0F 8C A6 FC FF FF",
                 Offset = 2,
                 Bytes = [PluginConfig.MaxPlayers]
             },
@@ -81,7 +80,7 @@ public class CM_PageMapManualPatch : ManualPatch
             {
                 Method = nameof(CM_PageMap.UpdatePlayerData),
                 Description = "Adjust CM_PageMap::UpdatePlayerData() for (int i = 0; i < 4; i++) to new max players.",
-                Pattern = "83 FB 04 0F 8C 21 FF FF FF",
+                Pattern = "83 FB 04 0F 8C 1B FF FF FF",
                 Offset = 2,
                 Bytes = [PluginConfig.MaxPlayers]
             },
