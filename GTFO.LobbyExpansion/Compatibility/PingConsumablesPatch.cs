@@ -1,7 +1,7 @@
-using System.Reflection;
 using BepInEx.Logging;
 using GTFO.LobbyExpansion.Util;
 using HarmonyLib;
+using System.Reflection;
 
 namespace GTFO.LobbyExpansion.Compatibility;
 
@@ -56,8 +56,6 @@ public class PingConsumablesPatch : ModCompatibilityPatch
 
     private PingConsumablesPatch() { }
 
-    #region Overrides of ModCompatibilityPatch
-
     public override bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
@@ -81,8 +79,6 @@ public class PingConsumablesPatch : ModCompatibilityPatch
 
         L.Debug($"Applied patches in {nameof(PingConsumablesPatch)}.");
     }
-
-    #endregion
 
     [HarmonyWrapSafe]
     private static bool LogEvent_Prefix(LogEventArgs eventArgs)

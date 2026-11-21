@@ -1,11 +1,11 @@
 // Credit to Dinorush for a large part of the original fix.
 
+using GTFO.LobbyExpansion.Util;
+using HarmonyLib;
+using Il2CppInterop.Runtime;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
-using GTFO.LobbyExpansion.Util;
-using Il2CppInterop.Runtime;
-using HarmonyLib;
 
 namespace GTFO.LobbyExpansion.Compatibility;
 
@@ -39,8 +39,6 @@ public class ChatterRebornPatch : ModCompatibilityPatch
     private FieldInfo? _aggressiveEnemiesField;
 
     private ChatterRebornPatch() { }
-
-    #region Overrides of ModCompatibilityPatch
 
     public override bool ShouldApply()
     {
@@ -110,8 +108,6 @@ public class ChatterRebornPatch : ModCompatibilityPatch
             L.Error($"{nameof(ChatterRebornPatch)}: pre-existing EnemyDramaBehavior fix-up failed (non-fatal): {ex}");
         }
     }
-
-    #endregion
 
     private void ResolveMembers()
     {

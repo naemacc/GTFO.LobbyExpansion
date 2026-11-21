@@ -1,7 +1,7 @@
-using System.Collections.Generic;
-using System.Reflection.Emit;
 using GTFO.LobbyExpansion.Util;
 using HarmonyLib;
+using System.Collections.Generic;
+using System.Reflection.Emit;
 
 namespace GTFO.LobbyExpansion.Compatibility;
 
@@ -52,8 +52,6 @@ public class ModListPatch : ModCompatibilityPatch
 
     private ModListPatch() { }
 
-    #region Overrides of ModCompatibilityPatch
-
     public override bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
@@ -79,8 +77,6 @@ public class ModListPatch : ModCompatibilityPatch
             throw;
         }
     }
-
-    #endregion
 
     private void ExpandUiModButtons()
     {

@@ -1,5 +1,5 @@
-using System.Collections.Generic;
 using SNetwork;
+using System.Collections.Generic;
 
 namespace GTFO.LobbyExpansion;
 

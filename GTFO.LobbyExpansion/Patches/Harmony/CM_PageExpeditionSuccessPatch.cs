@@ -156,5 +156,4 @@ public static class CM_PageExpeditionSuccessPatch
         }).WrapToIl2Cpp());
     }
 
-
 }

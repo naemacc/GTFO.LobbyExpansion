@@ -1,8 +1,8 @@
-using System.Collections;
-using System.Reflection;
 using GTFO.LobbyExpansion.Util;
 using HarmonyLib;
 using SNetwork;
+using System.Collections;
+using System.Reflection;
 
 namespace GTFO.LobbyExpansion.Compatibility;
 
@@ -62,8 +62,6 @@ public class OptionalNetworkAPIPatch : ModCompatibilityPatch
 
     private OptionalNetworkAPIPatch() { }
 
-    #region Overrides of ModCompatibilityPatch
-
     public override bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
@@ -93,8 +91,6 @@ public class OptionalNetworkAPIPatch : ModCompatibilityPatch
 
         L.Debug($"Applied patches in {nameof(OptionalNetworkAPIPatch)}.");
     }
-
-    #endregion
 
     [HarmonyWrapSafe]
     private static void OnAddPlayer_Prefix(SNet_Player player)

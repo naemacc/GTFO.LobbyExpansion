@@ -45,7 +45,6 @@ public static class ElevatorCagePatch
         return HarmonyControlFlow.Execute;
     }
 
-
     [HarmonyPatch(nameof(ElevatorCage.RegisterSpawnPoints))]
     [HarmonyPrefix]
     [HarmonyWrapSafe]

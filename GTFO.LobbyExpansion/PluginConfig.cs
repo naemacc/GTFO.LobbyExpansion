@@ -1,7 +1,7 @@
+using SNetwork;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
-using SNetwork;
 
 namespace GTFO.LobbyExpansion;
 

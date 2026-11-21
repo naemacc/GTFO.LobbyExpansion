@@ -63,6 +63,6 @@ public class Pagination
 
     public static int GetPageFromSlotIndex(int slotIndex)
     {
-        return (int) Math.Floor(slotIndex / 4f);
+        return (int)Math.Floor(slotIndex / 4f);
     }
 }

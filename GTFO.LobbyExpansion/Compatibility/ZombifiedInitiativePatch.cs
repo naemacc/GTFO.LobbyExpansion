@@ -97,8 +97,6 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
 
     private ZombifiedInitiativePatch() { }
 
-    #region Overrides of ModCompatibilityPatch
-
     public override bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
@@ -128,8 +126,6 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
             L.Error($"{nameof(ZombifiedInitiativePatch)}: sentry mode networking fix failed, sentry mode will remain host-only: {ex}");
         }
     }
-
-    #endregion
 
     protected void ApplyPatches(Harmony harmony)
     {

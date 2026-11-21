@@ -1,6 +1,6 @@
-using System.Collections.Generic;
 using ChainedPuzzles;
 using HarmonyLib;
+using System.Collections.Generic;
 
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 

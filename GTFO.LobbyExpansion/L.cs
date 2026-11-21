@@ -1,6 +1,6 @@
+using BepInEx.Logging;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using BepInEx.Logging;
 
 namespace GTFO.LobbyExpansion;
 

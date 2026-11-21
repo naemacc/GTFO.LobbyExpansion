@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using ChainedPuzzles;
 using HarmonyLib;
 using Player;
@@ -26,12 +25,12 @@ public static class ECC_CompatibilityPatch
         // Recompute
         var actualCount = CountPlayersInScan(bioscanCore);
 
-        var requireAll    = bioscanCore.m_playerScanner.ScanPlayersRequired.RequireAllPlayers();
-        var requireSolo   = bioscanCore.m_playerScanner.ScanPlayersRequired.RequireSoloPlayer();
+        var requireAll = bioscanCore.m_playerScanner.ScanPlayersRequired.RequireAllPlayers();
+        var requireSolo = bioscanCore.m_playerScanner.ScanPlayersRequired.RequireSoloPlayer();
         var noRequirement = bioscanCore.m_playerScanner.ScanPlayersRequired == PlayerRequirement.None;
 
         var shouldMove = noRequirement ||
-                         (requireAll  && actualCount >= totalAlive) ||
+                         (requireAll && actualCount >= totalAlive) ||
                          (requireSolo && actualCount == 1);
 
         if (shouldMove)
@@ -51,9 +50,9 @@ public static class ECC_CompatibilityPatch
             return 0;
 
         var radiusSqr = scanner.Radius * scanner.Radius;
-        var scanPos   = core.transform.position;
-        var count     = 0;
-        var players   = PlayerManager.PlayerAgentsInLevel;
+        var scanPos = core.transform.position;
+        var count = 0;
+        var players = PlayerManager.PlayerAgentsInLevel;
 
         for (var i = 0; i < players.Count; i++)
         {
@@ -68,7 +67,7 @@ public static class ECC_CompatibilityPatch
     private static int CountAlivePlayersInLevel()
     {
         var players = PlayerManager.PlayerAgentsInLevel;
-        var count   = 0;
+        var count = 0;
         for (var i = 0; i < players.Count; i++)
         {
             var p = players[i];

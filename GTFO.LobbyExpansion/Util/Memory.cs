@@ -1,12 +1,11 @@
 // Credit to https://github.com/BepInEx/Il2CppInterop/blob/master/Il2CppInterop.Runtime/MemoryUtils.cs for FindSignatureInBlock
 
-using System.Diagnostics;
+using Il2CppInterop.Common;
+using Il2CppInterop.Runtime.InteropTypes;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using Il2CppInterop.Common;
-using Il2CppInterop.Runtime.InteropTypes;
 using BindingFlags = System.Reflection.BindingFlags;
 
 namespace GTFO.LobbyExpansion.Util;

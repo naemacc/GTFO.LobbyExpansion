@@ -1,8 +1,8 @@
-using System.Collections;
-using System.Reflection;
 using GTFO.LobbyExpansion.Util;
 using HarmonyLib;
 using SNetwork;
+using System.Collections;
+using System.Reflection;
 
 namespace GTFO.LobbyExpansion.Compatibility;
 
@@ -96,8 +96,6 @@ public class LocaliaCorePatch : ModCompatibilityPatch
 
     private LocaliaCorePatch() { }
 
-    #region Overrides of ModCompatibilityPatch
-
     public override bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
@@ -117,8 +115,6 @@ public class LocaliaCorePatch : ModCompatibilityPatch
         ExpandArrays();
         ApplyPatches(harmony);
     }
-
-    #endregion
 
     private void ResolveMembers(Type logsType)
     {
@@ -214,8 +210,6 @@ public class LocaliaCorePatch : ModCompatibilityPatch
         var prefix = AccessTools.Method(typeof(LocaliaCorePatch), prefixName);
         harmony.Patch(original, prefix: new HarmonyMethod(prefix));
     }
-
-    #region Manual patches (reflection-only targets, no compile-time reference to LocaliaCore)
 
     [HarmonyWrapSafe]
     private static bool Network_Manager__outLobbyClear__Prefix()
@@ -389,5 +383,4 @@ public class LocaliaCorePatch : ModCompatibilityPatch
         return false;
     }
 
-    #endregion
 }

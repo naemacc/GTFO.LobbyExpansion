@@ -1,10 +1,10 @@
-using System.Collections.Generic;
 using BepInEx;
 using BepInEx.Unity.IL2CPP;
 using GTFO.LobbyExpansion.Compatibility;
 using GTFO.LobbyExpansion.Patches.Manual;
 using GTFO.LobbyExpansion.Util;
 using HarmonyLib;
+using System.Collections.Generic;
 
 namespace GTFO.LobbyExpansion;
 

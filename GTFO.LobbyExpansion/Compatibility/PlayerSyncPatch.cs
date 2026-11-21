@@ -37,8 +37,6 @@ public class PlayerSyncPatch : ModCompatibilityPatch
 
     private PlayerSyncPatch() { }
 
-    #region Overrides of ModCompatibilityPatch
-
     public override bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
@@ -72,8 +70,6 @@ public class PlayerSyncPatch : ModCompatibilityPatch
             throw;
         }
     }
-
-    #endregion
 
     // Skips the original entirely when sender couldn't be resolved, instead of letting it
     // NullReferenceException on sender.Lookup. Mirrors AmmoSync's own (correct) null-check.

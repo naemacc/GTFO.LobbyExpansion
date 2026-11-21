@@ -1,16 +1,14 @@
 // Credit to Dinorush for a large part of the fix.
 
-using System.Linq;
 using GTFO.LobbyExpansion.Util;
 using HarmonyLib;
+using System.Linq;
 
 namespace GTFO.LobbyExpansion.Compatibility;
 
 public class PacksHelperPatch : ModCompatibilityPatch
 {
     public const string PluginGuid = "Localia.PacksHelper";
-
-    #region Overrides of ModCompatibilityPatch
 
     public override bool ShouldApply()
     {
@@ -32,8 +30,6 @@ public class PacksHelperPatch : ModCompatibilityPatch
 
         PatchManagerType(managerType);
     }
-
-    #endregion
 
     protected static void PatchManagerType(Type managerType)
     {

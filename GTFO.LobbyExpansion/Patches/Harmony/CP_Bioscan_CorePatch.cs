@@ -1,7 +1,7 @@
-using System.Collections.Generic;
 using ChainedPuzzles;
 using HarmonyLib;
 using Player;
+using System.Collections.Generic;
 
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 

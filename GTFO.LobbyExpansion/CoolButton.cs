@@ -1,5 +1,5 @@
-using System.Linq;
 using CellMenu;
+using System.Linq;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -66,7 +66,6 @@ public static class CoolButton
         {
             arrow.localRotation = Quaternion.Euler(0, 0, -90);
         }
-
 
         cmButton.m_hoverSpriteArray = button.gameObject.GetComponentsInChildren<SpriteRenderer>(includeInactive: true).ToArray();
 
