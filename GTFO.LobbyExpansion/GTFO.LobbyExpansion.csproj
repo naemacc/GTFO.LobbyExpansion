@@ -5,6 +5,17 @@
 		<Error Text="The GameFolder property must be set to the GTFO game folder." Condition="'$(GameFolder)' == '' or !Exists('$(GameFolder)')" />
 	</Target>
 
+  <!-- Branch Output Path -->
+  <Target Name="SetBranchOutputPath" BeforeTargets="PrepareForBuild">
+    <Exec Command="git rev-parse --abbrev-ref HEAD" ConsoleToMSBuild="true" IgnoreExitCode="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="GitBranch" />
+    </Exec>
+    <PropertyGroup Condition="'$(GitBranch)' != ''">
+      <OutputPath>$(OutputPath)$(GitBranch)\</OutputPath>
+      <IntermediateOutputPath>$(IntermediateOutputPath)$(GitBranch)\</IntermediateOutputPath>
+    </PropertyGroup>
+  </Target>
+
 	<PropertyGroup>
 		<!-- TargetFramework does not explicitly need to be 6, but it is recommended you keep 6 to match. -->
 		<TargetFramework>net6.0-windows</TargetFramework>
@@ -58,7 +69,7 @@
 		<Reference Remove="$(InteropFolder)/netstandard.dll" />
 
 		<!-- Uncomment if using GTFO-API in the plugin. -->
-		<Reference Include="$(PluginsFolder)/GTFO-API.dll" Private="false" /> 
+		<Reference Include="$(PluginsFolder)/GTFO-API.dll" Private="false" />
 	</ItemGroup>
 
 <!--	<ItemGroup>-->
