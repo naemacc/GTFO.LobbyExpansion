@@ -12,29 +12,9 @@ public static class ElevatorCagePatch
     [HarmonyPatch(nameof(ElevatorCage.SkipPreReleaseSequence))]
     [HarmonyPrefix]
     [HarmonyWrapSafe]
-    public static bool SkipPreReleaseSequence__Prefix(ElevatorCage __instance, CellSoundPlayer sound, ref int playerId)
+    public static bool SkipPreReleaseSequence__Prefix(ElevatorCage __instance, ref int playerId)
     {
         L.LogExecutingMethod($"{nameof(playerId)}: {playerId}");
-
-        // We need to extend this for other parts of the game's code.
-        // if (__instance.m_seatsFromShaft.Length < PluginConfig.MaxPlayers)
-        // {
-        //     L.Verbose($"Expanding {nameof(__instance.m_seatsFromShaft)} size from {__instance.m_seatsFromShaft.Length} to {PluginConfig.MaxPlayers}.");
-        //     var original = __instance.m_seatsFromShaft;
-        //     __instance.m_seatsFromShaft = new Il2CppReferenceArray<ElevatorSeat>(PluginConfig.MaxPlayers);
-        //
-        //     for (var x = 0; x < original.Length; x++)
-        //     {
-        //         var seat = x % 4; //x > 3 ? 0 : x;
-        //         __instance.m_seatsFromShaft[x] = original[seat];
-        //     }
-        // }
-
-        // if (playerId >= __instance.m_seatsFromShaft.Length)
-        // {
-        //     L.Warning($"playerId {playerId} is past seats from shaft length: skipping call.");
-        //     return HarmonyControlFlow.DontExecute;
-        // }
 
         if (__instance.m_seatsFromShaft[playerId] == null)
         {
@@ -55,7 +35,7 @@ public static class ElevatorCagePatch
 
         for (var i = 0; i < PluginConfig.MaxPlayers; i++)
         {
-            var seat = i % 4; //i > 3 ? 0 : i;
+            var seat = i % 4;
             __instance.m_spawnPoints[i] = PlayerManager.RegisterSpawnpoint(
                 PlayerspawnpointType.StartInElevator,
                 i,
@@ -68,7 +48,7 @@ public static class ElevatorCagePatch
     [HarmonyPatch(nameof(ElevatorCage.PlaySeatOpenStraps))]
     [HarmonyPrefix]
     [HarmonyWrapSafe]
-    public static bool PlaySeatOpenStraps__Prefix(CellSoundPlayer sound, int playerId, bool isLocal)
+    public static bool PlaySeatOpenStraps__Prefix(int playerId)
     {
         if (playerId > 3)
         {

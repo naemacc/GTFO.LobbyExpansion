@@ -1,6 +1,7 @@
 using BepInEx.Logging;
 using GTFO.LobbyExpansion.Util;
 using HarmonyLib;
+using System.Linq;
 using System.Reflection;
 
 namespace GTFO.LobbyExpansion.Compatibility;
@@ -38,7 +39,7 @@ namespace GTFO.LobbyExpansion.Compatibility;
  * its static `Plugin.L` field via LogEventArgs.Source) so this can't affect any other mod's
  * Info-level logging that happens to contain similar text.
  */
-public class PingConsumablesPatch : ModCompatibilityPatch
+public class PingConsumablesPatch : IModCompatibilityPatch
 {
     public const string PluginGuid = "PingConsumables";
 
@@ -47,33 +48,28 @@ public class PingConsumablesPatch : ModCompatibilityPatch
     // Substrings identifying the two specific recurring log lines to suppress. Add more here
     // if other messages turn out to be similarly spammy - everything else stays untouched.
     private static readonly string[] SpammyMessageSubstrings =
-    {
+    [
         "spawnnode and locatorbeacon position",
         "removed from terminals as it was picked up",
-    };
+    ];
 
     private FieldInfo? _loggerField;
 
     private PingConsumablesPatch() { }
 
-    public override bool ShouldApply()
+    public bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
     }
 
-    public override void Apply(Harmony harmony)
+    public void Apply(Harmony harmony)
     {
         var pluginInstance = BepInExUtil.GetPluginInstance(PluginGuid);
         var pluginType = pluginInstance.GetType();
 
-        _loggerField = AccessTools.Field(pluginType, "L");
-        if (_loggerField is null)
-            throw new Exception($"Unable to find {pluginType.FullName}.L; PingConsumables' internals may have changed.");
+        _loggerField = AccessTools.Field(pluginType, "L") ?? throw new MissingFieldException($"Unable to find {pluginType.FullName}.L; PingConsumables' internals may have changed.");
 
-        var logEventMethod = AccessTools.Method(typeof(DiskLogListener), nameof(DiskLogListener.LogEvent));
-        if (logEventMethod is null)
-            throw new Exception("Unable to find DiskLogListener.LogEvent(object, LogEventArgs).");
-
+        var logEventMethod = AccessTools.Method(typeof(DiskLogListener), nameof(DiskLogListener.LogEvent)) ?? throw new MissingMethodException("Unable to find DiskLogListener.LogEvent(object, LogEventArgs).");
         var prefix = AccessTools.Method(typeof(PingConsumablesPatch), nameof(LogEvent_Prefix));
         harmony.Patch(logEventMethod, prefix: new HarmonyMethod(prefix));
 
@@ -91,11 +87,8 @@ public class PingConsumablesPatch : ModCompatibilityPatch
             return true; // not PingConsumables' logger - leave every other mod's logging alone
 
         var text = eventArgs.Data?.ToString() ?? "";
-        foreach (var substring in SpammyMessageSubstrings)
-        {
-            if (text.Contains(substring))
-                return false; // skip writing this line to the log file
-        }
+        if (SpammyMessageSubstrings.Any(substring => text.Contains(substring)))
+            return false; // skip writing this line to the log file
 
         return true; // everything else (cleanup notice, per-level setup summary) stays visible
     }

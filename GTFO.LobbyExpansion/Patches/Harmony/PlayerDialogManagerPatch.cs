@@ -10,7 +10,7 @@ public static class PlayerDialogManagerPatch
     [HarmonyPatch([typeof(uint), typeof(PlayerAgent)])]
     [HarmonyPrefix]
     [HarmonyWrapSafe]
-    public static bool WantToStartDialog__Prefix(uint dialogID, PlayerAgent source)
+    public static bool WantToStartDialog__Prefix(PlayerAgent source)
     {
         L.LogExecutingMethod();
 

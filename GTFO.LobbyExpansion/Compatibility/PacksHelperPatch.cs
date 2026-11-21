@@ -6,16 +6,16 @@ using System.Linq;
 
 namespace GTFO.LobbyExpansion.Compatibility;
 
-public class PacksHelperPatch : ModCompatibilityPatch
+public class PacksHelperPatch : IModCompatibilityPatch
 {
     public const string PluginGuid = "Localia.PacksHelper";
 
-    public override bool ShouldApply()
+    public bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
     }
 
-    public override void Apply(Harmony harmony)
+    public void Apply(Harmony harmony)
     {
         var pluginInstance = BepInExUtil.GetPluginInstance(PluginGuid);
         var types = pluginInstance.GetType().Assembly.GetTypes();

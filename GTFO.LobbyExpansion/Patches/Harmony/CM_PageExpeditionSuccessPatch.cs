@@ -7,18 +7,13 @@ using UnityEngine;
 
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
+#pragma warning disable S101
+
 [HarmonyPatch(typeof(CM_PageExpeditionSuccess))]
 public static class CM_PageExpeditionSuccessPatch
 {
     private static bool _needPositionUpdate;
     private static DateTime _lastVisibilityUpdate = DateTime.Now;
-
-    // [HarmonyPatch(nameof(CM_PageExpeditionSuccess.OnEnable))]
-    // [HarmonyPrefix]
-    // public static bool OnEnable__Prefix(CM_PageExpeditionSuccess __instance)
-    // {
-    //     return HarmonyControlFlow.Execute;
-    // }
 
     [HarmonyPatch(nameof(CM_PageExpeditionSuccess.OnEnable))]
     [HarmonyPostfix]
@@ -81,28 +76,16 @@ public static class CM_PageExpeditionSuccessPatch
 
         for (var i = 0; i < page.m_playerReports.Count; i++)
         {
-            if (page.m_playerReports[i] == null)
+            var report = page.m_playerReports[i];
+            if (report == null)
                 continue;
 
-            var visible = true;
+            var visible = i >= minVisibleIndex
+                && i < maxVisibleIndex
+                && i < playerSlots.Count
+                && playerSlots[i].player != null;
 
-            if (i < minVisibleIndex)
-            {
-                //L.Verbose($"Hiding lobby bar at slot {i} since it is below the minimum visible index {minVisibleIndex}.");
-                visible = false;
-            }
-            else if (i >= maxVisibleIndex)
-            {
-                //L.Verbose($"Hiding lobby bar at slot {i} since it is above the maximum visible index {maxVisibleIndex}.");
-                visible = false;
-            }
-            else if (i >= playerSlots.Count || playerSlots[i].player == null)
-            {
-                //L.Verbose($"Hiding extra slot {i} since we don't have a player in that slot.");
-                visible = false;
-            }
-
-            page.m_playerReports[i].gameObject.SetActive(visible);
+            report.gameObject.SetActive(visible);
         }
     }
 
@@ -129,7 +112,7 @@ public static class CM_PageExpeditionSuccessPatch
 
     [HarmonyPatch(nameof(CM_PageExpeditionSuccess.Setup))]
     [HarmonyPostfix]
-    public static void Setup__Postfix(CM_PageExpeditionSuccess __instance, MainMenuGuiLayer guiLayer)
+    public static void Setup__Postfix(CM_PageExpeditionSuccess __instance)
     {
         _pagination.OnPageChanged += OnPageChanged;
 

@@ -4,12 +4,14 @@ using System.Collections.Generic;
 
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
+#pragma warning disable S101
+
 [HarmonyPatch(typeof(CP_Bioscan_Hud))]
 public static class CP_Bioscan_HudPatch
 {
     // Map HUD instance ID to Core
     // stable int key instead of object reference
-    internal static readonly Dictionary<int, CP_Bioscan_Core> HudToCoreMap = new();
+    internal static readonly Dictionary<int, CP_Bioscan_Core> HudToCoreMap = [];
 
     internal static void OnLevelCleanup()
     {

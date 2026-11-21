@@ -36,19 +36,6 @@ public class Plugin : BasePlugin
 
         try
         {
-#if DEBUG
-            // TODO: Remove this later, just helps find it easier in BepInEx console
-            L.Warning("------------------------------------------------------");
-            L.Warning("------------------------------------------------------");
-            L.Warning("------------------------------------------------------");
-            L.Warning("------------------------------------------------------");
-            L.Warning("-------------- Applying manual patches. --------------");
-            L.Warning("------------------------------------------------------");
-            L.Warning("------------------------------------------------------");
-            L.Warning("------------------------------------------------------");
-            L.Warning("------------------------------------------------------");
-#endif
-
             var appliedPatches = new HashSet<Type>();
             var manualPatches = new List<ManualPatch>
             {
@@ -107,19 +94,6 @@ public class Plugin : BasePlugin
             return;
         }
 
-#if DEBUG
-        // TODO: Remove this later, just helps find it easier in BepInEx console
-        L.Warning("------------------------------------------------------");
-        L.Warning("------------------------------------------------------");
-        L.Warning("------------------------------------------------------");
-        L.Warning("------------------------------------------------------");
-        L.Warning("-------------- Applying Harmony patches. -------------");
-        L.Warning("------------------------------------------------------");
-        L.Warning("------------------------------------------------------");
-        L.Warning("------------------------------------------------------");
-        L.Warning("------------------------------------------------------");
-#endif
-
         try
         {
             _harmony = new Harmony(PluginInfo.Guid);
@@ -132,20 +106,7 @@ public class Plugin : BasePlugin
             return;
         }
 
-#if DEBUG
-        // TODO: Remove this later, just helps find it easier in BepInEx console
-        L.Warning("------------------------------------------------------");
-        L.Warning("------------------------------------------------------");
-        L.Warning("------------------------------------------------------");
-        L.Warning("------------------------------------------------------");
-        L.Warning("--------- Applying mod compatibility patches. --------");
-        L.Warning("------------------------------------------------------");
-        L.Warning("------------------------------------------------------");
-        L.Warning("------------------------------------------------------");
-        L.Warning("------------------------------------------------------");
-#endif
-
-        var modCompatibilityPatches = new List<ModCompatibilityPatch>()
+        var modCompatibilityPatches = new List<IModCompatibilityPatch>()
         {
             new PacksHelperPatch(),
             LocaliaCorePatch.Instance,
@@ -176,7 +137,6 @@ public class Plugin : BasePlugin
             {
                 L.Fatal($"An error occurred while applying mod compatibility patch {patchName}:");
                 L.Fatal(e);
-                continue; //previously skip other on the list
             }
         }
 

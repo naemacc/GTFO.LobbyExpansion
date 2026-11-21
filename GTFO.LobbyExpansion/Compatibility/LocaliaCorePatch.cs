@@ -3,6 +3,7 @@ using HarmonyLib;
 using SNetwork;
 using System.Collections;
 using System.Reflection;
+using System.Security.Cryptography;
 
 namespace GTFO.LobbyExpansion.Compatibility;
 
@@ -34,14 +35,14 @@ namespace GTFO.LobbyExpansion.Compatibility;
  * would be silently wrong for lobbies bigger than 4, so they're fixed here too rather than left
  * as a "doesn't crash, good enough" gap.
  */
-public class LocaliaCorePatch : ModCompatibilityPatch
+public class LocaliaCorePatch : IModCompatibilityPatch
 {
     public const string PluginGuid = "Localia.LocaliaCore";
 
     public static LocaliaCorePatch Instance { get; } = new();
 
     private static readonly string[] ArrayFieldNames =
-    {
+    [
         "slot_lookup",
         "slot_SNet",
         "slot_avaliable",
@@ -57,7 +58,7 @@ public class LocaliaCorePatch : ModCompatibilityPatch
         "slot_ping",
         "modListBuffer",
         "modList",
-    };
+    ];
 
     private Type? _networkManagerType;
     private Type? _apiType;
@@ -96,12 +97,12 @@ public class LocaliaCorePatch : ModCompatibilityPatch
 
     private LocaliaCorePatch() { }
 
-    public override bool ShouldApply()
+    public bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
     }
 
-    public override void Apply(Harmony harmony)
+    public void Apply(Harmony harmony)
     {
         var pluginInstance = BepInExUtil.GetPluginInstance(PluginGuid);
         var assembly = pluginInstance.GetType().Assembly;
@@ -164,10 +165,8 @@ public class LocaliaCorePatch : ModCompatibilityPatch
     {
         foreach (var fieldName in ArrayFieldNames)
         {
-            var field = AccessTools.Field(_networkManagerType, fieldName);
-
-            if (field is null)
-                throw new Exception($"Unable to find Network_Manager.{fieldName}.");
+            var field = AccessTools.Field(_networkManagerType, fieldName)
+                ?? throw new MissingFieldException($"Unable to find Network_Manager.{fieldName}.");
 
             var oldArray = (Array)field.GetValue(null)!;
 
@@ -184,7 +183,7 @@ public class LocaliaCorePatch : ModCompatibilityPatch
         // initialized the same way clearSlot() does for the vanilla slots, otherwise the first
         // access to them (e.g. modListBuffer[slot][index] = ...) throws a NullReferenceException.
         for (var i = 4; i < PluginConfig.MaxPlayers; i++)
-            _clearSlotMethod!.Invoke(null, new object[] { i });
+            _clearSlotMethod!.Invoke(null, [i]);
 
         L.Debug($"{nameof(LocaliaCorePatch)}: expanded {ArrayFieldNames.Length} Network_Manager arrays to {PluginConfig.MaxPlayers}.");
     }
@@ -202,11 +201,7 @@ public class LocaliaCorePatch : ModCompatibilityPatch
 
     private static void PatchMethod(Harmony harmony, Type? targetType, string methodName, string prefixName)
     {
-        var original = AccessTools.Method(targetType, methodName);
-
-        if (original is null)
-            throw new Exception($"Unable to find {targetType?.FullName}::{methodName}().");
-
+        var original = AccessTools.Method(targetType, methodName) ?? throw new MissingMethodException($"Unable to find {targetType?.FullName}::{methodName}().");
         var prefix = AccessTools.Method(typeof(LocaliaCorePatch), prefixName);
         harmony.Patch(original, prefix: new HarmonyMethod(prefix));
     }
@@ -216,11 +211,10 @@ public class LocaliaCorePatch : ModCompatibilityPatch
     {
         var self = Instance;
 
-        var random = new Random();
-        self._myChalNumField!.SetValue(null, random.Next(10000, 99999));
+        self._myChalNumField!.SetValue(null, RandomNumberGenerator.GetInt32(10000, 100000));
 
         for (var i = 0; i < PluginConfig.MaxPlayers; i++)
-            self._clearSlotMethod!.Invoke(null, new object[] { i });
+            self._clearSlotMethod!.Invoke(null, [i]);
 
         ((IDictionary)self._heartBeatBufferField!.GetValue(null)!).Clear();
 
@@ -234,20 +228,8 @@ public class LocaliaCorePatch : ModCompatibilityPatch
 
         try
         {
-            var boardcastAvaliable = (int)self._boardcastAvaliableField!.GetValue(null)!;
+            self.TryBroadcastA2sInfo();
 
-            if (boardcastAvaliable > 0
-                && Clock.Time > (float)self._nextBoardcastAvaliableTimeField!.GetValue(null)!
-                && (bool)self._sendA2sInfoMethod!.Invoke(null, new object?[] { null })!)
-            {
-                boardcastAvaliable--;
-                self._boardcastAvaliableField.SetValue(null, boardcastAvaliable);
-                self._nextBoardcastAvaliableTimeField.SetValue(null, Clock.Time + 2f * (5 - boardcastAvaliable) + 1f);
-            }
-
-            var humanCount = 0;
-            var availableCount = 0;
-            var completedCount = 0;
             var canSend = false;
 
             if (Clock.Time > (float)self._nextHeartbeatTimeField!.GetValue(null)!)
@@ -256,70 +238,108 @@ public class LocaliaCorePatch : ModCompatibilityPatch
                 canSend = true;
             }
 
-            var slotLookup = (ulong[])self._slotLookupField!.GetValue(null)!;
-            var slotSNet = (SNet_Player[])self._slotSNetField!.GetValue(null)!;
-            var slotAvaliable = (ulong[])self._slotAvaliableField!.GetValue(null)!;
-            var gotModList = (bool[])self._gotModListField!.GetValue(null)!;
-
-            for (var i = 0; i < PluginConfig.MaxPlayers; i++)
-            {
-                if (slotLookup[i] == 0uL || slotSNet[i] is null || slotSNet[i].IsBot)
-                    continue;
-
-                humanCount++;
-
-                if (slotAvaliable[i] == 0uL)
-                    continue;
-
-                availableCount++;
-
-                if (gotModList[i])
-                    completedCount++;
-                else
-                    self._checkModListGettingMethod!.Invoke(null, new object[] { i });
-
-                self._checkHeartbeatMethod!.Invoke(null, new object[] { i, canSend });
-            }
-
-            var playerCount = (int)self._playerCountField!.GetValue(null)!;
-            var availCountField = (int)self._availableCountField!.GetValue(null)!;
-            var completedCountField = (int)self._completedCountField!.GetValue(null)!;
-            var changed = false;
-
-            if (playerCount != humanCount)
-            {
-                changed = true;
-                self._onHumanCountChangedMethod!.Invoke(null, new object[] { playerCount, humanCount });
-            }
-
-            if (availCountField != availableCount)
-            {
-                changed = true;
-                self._onAvailableHumanCountChangedMethod!.Invoke(null, new object[] { availCountField, availableCount });
-            }
-
-            if (completedCountField != completedCount)
-            {
-                changed = true;
-                // Matches the original's own (likely unintentional) use of availableCount here
-                // rather than completedCount, preserved for behavioral parity.
-                self._onModListHumanCountChangedMethod!.Invoke(null, new object[] { availCountField, completedCount });
-            }
-
-            if (changed)
-            {
-                var available = (int)self._availableCountField!.GetValue(null)!;
-                var player = (int)self._playerCountField!.GetValue(null)!;
-                var completed = (int)self._completedCountField!.GetValue(null)!;
-                self._logsVerboseMethod!.Invoke(null, new object[] { $"human available: {available}/{player}, credited: {completed}" });
-            }
+            var (humanCount, availableCount, completedCount) = self.CountSlotStatus(canSend);
+            self.ApplyCountChanges(humanCount, availableCount, completedCount);
         }
         catch (Exception ex)
         {
-            self._logsErrorMethod!.Invoke(null, new object[] { ex.Message });
+            self._logsErrorMethod!.Invoke(null, [ex.Message]);
         }
 
         return false; // skip the original's hardcoded-to-4 loop entirely
+    }
+
+    private void TryBroadcastA2sInfo()
+    {
+        var boardcastAvaliable = (int)_boardcastAvaliableField!.GetValue(null)!;
+
+        if (boardcastAvaliable > 0
+            && Clock.Time > (float)_nextBoardcastAvaliableTimeField!.GetValue(null)!
+            && (bool)_sendA2sInfoMethod!.Invoke(null, [null])!)
+        {
+            boardcastAvaliable--;
+            _boardcastAvaliableField.SetValue(null, boardcastAvaliable);
+            _nextBoardcastAvaliableTimeField.SetValue(null,
+                Clock.Time + 2f * (5 - boardcastAvaliable) + 1f);
+        }
+    }
+
+    private (int HumanCount, int AvailableCount, int CompletedCount) CountSlotStatus(bool canSend)
+    {
+        var humanCount = 0;
+        var availableCount = 0;
+        var completedCount = 0;
+
+        var slotLookup = (ulong[])_slotLookupField!.GetValue(null)!;
+        var slotSNet = (SNet_Player[])_slotSNetField!.GetValue(null)!;
+        var slotAvaliable = (ulong[])_slotAvaliableField!.GetValue(null)!;
+        var gotModList = (bool[])_gotModListField!.GetValue(null)!;
+
+        for (var i = 0; i < PluginConfig.MaxPlayers; i++)
+        {
+            if (slotLookup[i] == 0uL || slotSNet[i] is null || slotSNet[i].IsBot)
+                continue;
+
+            humanCount++;
+
+            if (slotAvaliable[i] == 0uL)
+                continue;
+
+            availableCount++;
+
+            if (gotModList[i])
+            {
+                completedCount++;
+            }
+            else
+            {
+                _checkModListGettingMethod!.Invoke(null, [i]);
+            }
+
+            _checkHeartbeatMethod!.Invoke(null, [i, canSend]);
+        }
+
+        return (humanCount, availableCount, completedCount);
+    }
+
+    private void ApplyCountChanges(int humanCount, int availableCount, int completedCount)
+    {
+        var playerCount = (int)_playerCountField!.GetValue(null)!;
+        var availCountField = (int)_availableCountField!.GetValue(null)!;
+        var completedCountField = (int)_completedCountField!.GetValue(null)!;
+        var changed = false;
+
+        if (playerCount != humanCount)
+        {
+            changed = true;
+            _onHumanCountChangedMethod!.Invoke(null, [playerCount, humanCount]);
+        }
+
+        if (availCountField != availableCount)
+        {
+            changed = true;
+            _onAvailableHumanCountChangedMethod!.Invoke(null,
+                [availCountField, availableCount]);
+        }
+
+        if (completedCountField != completedCount)
+        {
+            changed = true;
+            // Matches the original's own (likely unintentional) use of availableCount here
+            // rather than completedCount, preserved for behavioral parity.
+            _onModListHumanCountChangedMethod!.Invoke(null,
+                [availCountField, completedCount]);
+        }
+
+        if (
+           changed
+           && _availableCountField?.GetValue(null) is int available
+           && _playerCountField?.GetValue(null) is int player
+           && _completedCountField?.GetValue(null) is int completed
+        )
+        {
+            _logsVerboseMethod?.Invoke(null, [$"human available: {available}/{player}, credited: {completed}"]);
+        }
     }
 
     [HarmonyWrapSafe]
@@ -359,18 +379,18 @@ public class LocaliaCorePatch : ModCompatibilityPatch
     }
 
     [HarmonyWrapSafe]
-    private static bool API__has_Everyone_Install_Plugin__Prefix(string PLUGIN_GUID, string minVer, string maxVer, ref bool __result)
+    private static bool API__has_Everyone_Install_Plugin__Prefix(string PLUGIN_GUID, ref bool __result)
     {
         var self = Instance;
 
         for (var i = 0; i < PluginConfig.MaxPlayers; i++)
         {
-            var isValidHuman = (bool)self._isValidHumanMethod!.Invoke(null, new object[] { i })!;
+            var isValidHuman = (bool)self._isValidHumanMethod!.Invoke(null, [i])!;
 
             if (!isValidHuman)
                 continue;
 
-            var hasPlugin = (bool)self._hasInstallPluginMethod!.Invoke(null, new object?[] { i, PLUGIN_GUID, null, null })!;
+            var hasPlugin = (bool)self._hasInstallPluginMethod!.Invoke(null, [i, PLUGIN_GUID, null, null])!;
 
             if (!hasPlugin)
             {

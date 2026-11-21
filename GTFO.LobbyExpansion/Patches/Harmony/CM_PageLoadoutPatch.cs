@@ -9,13 +9,14 @@ using UnityEngine;
 using Object = UnityEngine.Object;
 
 namespace GTFO.LobbyExpansion.Patches.Harmony;
+#pragma warning disable S101
 
 [HarmonyPatch(typeof(CM_PageLoadout))]
 public static class CM_PageLoadoutPatch
 {
     [HarmonyPatch(nameof(CM_PageLoadout.Setup))]
     [HarmonyPrefix]
-    public static bool Setup__Prefix(CM_PageLoadout __instance, MainMenuGuiLayer guiLayer)
+    public static bool Setup__Prefix(CM_PageLoadout __instance)
     {
         L.LogExecutingMethod();
         var original = __instance.m_playerInfoHolders;
@@ -59,7 +60,6 @@ public static class CM_PageLoadoutPatch
     [HarmonyPostfix]
     public static void ArrangePlayerPillarSpacing__Postfix(CM_PageLoadout __instance)
     {
-        //L.LogExecutingMethod();
         var originalPositions = new[]
         {
             __instance.m_playerInfoHolders[0].transform.position,
@@ -70,9 +70,7 @@ public static class CM_PageLoadoutPatch
 
         for (var i = 4; i < PluginConfig.MaxPlayers; i++)
         {
-            var rootName = $"Player{i + 1}Root";
-            //L.Verbose($"Updating extra player root position ({rootName}).");
-            var originalPillarAtIndex = __instance!.m_playerInfoHolders[i % 4];
+            var originalPillarAtIndex = __instance.m_playerInfoHolders[i % 4];
             __instance.m_playerInfoHolders[i].transform.position = originalPillarAtIndex.position;
             __instance.m_playerInfoHolders[i].transform.localPosition = originalPillarAtIndex.localPosition;
             __instance.m_playerInfoHolders[i].transform.localScale = originalPillarAtIndex.localScale;
@@ -90,14 +88,12 @@ public static class CM_PageLoadoutPatch
 
             if (i < minVisibleIndex)
             {
-                //L.Verbose($"Hiding lobby bar at slot {i} since it is below the minimum visible index {minVisibleIndex}.");
                 __instance.m_playerInfoHolders[i].gameObject.transform.position = new Vector3(5000, 5000, 5000);
                 continue;
             }
 
             if (i >= maxVisibleIndex)
             {
-                //L.Verbose($"Hiding lobby bar at slot {i} since it is above the maximum visible index {maxVisibleIndex}.");
                 __instance.m_playerInfoHolders[i].gameObject.transform.position = new Vector3(5000, 5000, 5000);
                 continue;
             }
@@ -113,24 +109,22 @@ public static class CM_PageLoadoutPatch
 
     [HarmonyPatch(nameof(CM_PageLoadout.Update))]
     [HarmonyPostfix]
-    public static void Update__Postfix(CM_PageLoadout __instance)
+    public static void Update__Postfix()
     {
-        if (Input.GetKeyDown(KeyCode.PageDown))
+        if (Input.GetKeyDown(KeyCode.PageDown) && _pagination.PageDown())
         {
-            if (_pagination.PageDown())
-                UpdateCustomButtons();
+            UpdateCustomButtons();
         }
 
-        if (Input.GetKeyDown(KeyCode.PageUp))
+        if (Input.GetKeyDown(KeyCode.PageUp) && _pagination.PageUp())
         {
-            if (_pagination.PageUp())
-                UpdateCustomButtons();
+            UpdateCustomButtons();
         }
     }
 
     [HarmonyPatch(nameof(CM_PageLoadout.ApplyPlayerSlotPermissionsFromSettings))]
     [HarmonyPostfix]
-    public static void ApplyPlayerSlotPermissionsFromSettings__Postfix(CM_PageLoadout __instance)
+    public static void ApplyPlayerSlotPermissionsFromSettings__Postfix()
     {
         L.LogExecutingMethod();
         // TODO: This may call the handlers twice, but does it really matter?
@@ -165,7 +159,6 @@ public static class CM_PageLoadoutPatch
     public static void OnDisable__Postfix()
     {
         L.LogExecutingMethod();
-        //PageIndex = 0;
     }
 
     private static CM_Item _centerButton = null!;
@@ -194,7 +187,7 @@ public static class CM_PageLoadoutPatch
 
     [HarmonyPatch(nameof(CM_PageLoadout.Setup))]
     [HarmonyPostfix]
-    public static void Setup__Postfix(CM_PageLoadout __instance, MainMenuGuiLayer guiLayer)
+    public static void Setup__Postfix(CM_PageLoadout __instance)
     {
         if (CM_PageLoadout.Current == null)
             return;

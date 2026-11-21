@@ -12,6 +12,9 @@
     </Exec>
     <PropertyGroup Condition="'$(GitBranch)' != ''">
       <OutputPath>$(OutputPath)$(GitBranch)\</OutputPath>
+      <TargetDir>$(MSBuildProjectDirectory)\$(OutputPath)</TargetDir>
+      <TargetPath>$(TargetDir)$(TargetFileName)</TargetPath>
+      <OutDir>$(OutputPath)</OutDir>
       <IntermediateOutputPath>$(IntermediateOutputPath)$(GitBranch)\</IntermediateOutputPath>
     </PropertyGroup>
   </Target>
@@ -83,7 +86,7 @@
 <!--	</ItemGroup>-->
 
 	<Target Name="CopyToGameFolder" AfterTargets="Build" Condition="$(CopyToPluginFolder) == 'true'">
-		<Message Importance="High" Text="Copying build to plugins folder ($(PluginsFolder))." />
-		<Copy SourceFiles="$(OutputPath)/$(AssemblyName).dll" DestinationFolder="$(PluginsFolder)" />
+		<Message Importance="High" Text="Copying build from $(TargetPath) to plugins folder ($(PluginsFolder))." />
+		<Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PluginsFolder)" />
 	</Target>
 </Project>

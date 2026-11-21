@@ -4,6 +4,8 @@ using UnityEngine;
 
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
+#pragma warning disable S101
+
 [HarmonyPatch(typeof(PUI_Compass))]
 public static class PUI_CompassPatch
 {
@@ -12,7 +14,7 @@ public static class PUI_CompassPatch
     public static void Setup__Postfix(PUI_Compass __instance)
     {
         L.LogExecutingMethod();
-        __instance!.m_playerPingMarkers = new Il2CppReferenceArray<NavMarker>(PluginConfig.MaxPlayers);
+        __instance.m_playerPingMarkers = new Il2CppReferenceArray<NavMarker>(PluginConfig.MaxPlayers);
         __instance.m_playerNameMarkers = new Il2CppReferenceArray<NavMarker>(PluginConfig.MaxPlayers);
         __instance.m_playerMarkersWorldPos = new Il2CppStructArray<Vector3>(PluginConfig.MaxPlayers);
         __instance.m_playerPingMarkersActive = new Il2CppStructArray<bool>(PluginConfig.MaxPlayers);

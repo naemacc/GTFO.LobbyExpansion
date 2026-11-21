@@ -27,38 +27,32 @@ namespace GTFO.LobbyExpansion.Compatibility;
  *      at PlayerSync.Sync.Stamina.StaminaSync.HandlePacket(Byte[] data, SNet_Player sender)
  *      at PlayerSync.Network.Net.OnReceive(Il2CppStructArray`1 bytes, UInt32 size, UInt64 messagerID)
  */
-public class PlayerSyncPatch : ModCompatibilityPatch
+public class PlayerSyncPatch : IModCompatibilityPatch
 {
     public const string PluginGuid = "io.takina.gtfo.PlayerSync";
 
     public static PlayerSyncPatch Instance { get; } = new();
 
-    private Type? _staminaSyncType;
-
     private PlayerSyncPatch() { }
 
-    public override bool ShouldApply()
+    public bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
     }
 
-    public override void Apply(Harmony harmony)
+    public void Apply(Harmony harmony)
     {
         try
         {
             var pluginInstance = BepInExUtil.GetPluginInstance(PluginGuid);
             var assembly = pluginInstance.GetType().Assembly;
 
-            _staminaSyncType = ReflectionUtil.GetRequiredTypeByName("StaminaSync", assembly);
+            var staminaSyncType = ReflectionUtil.GetRequiredTypeByName("StaminaSync", assembly);
 
             var original = AccessTools.Method(
-                _staminaSyncType,
+                staminaSyncType,
                 "HandlePacket",
-                new[] { typeof(byte[]), typeof(SNet_Player) });
-
-            if (original is null)
-                throw new Exception($"Unable to find {_staminaSyncType.FullName}::HandlePacket(byte[], SNet_Player).");
-
+                [typeof(byte[]), typeof(SNet_Player)]) ?? throw new MissingMethodException($"Unable to find {staminaSyncType.FullName}::HandlePacket(byte[], SNet_Player).");
             var prefix = AccessTools.Method(typeof(PlayerSyncPatch), nameof(StaminaSync__HandlePacket__Prefix));
             harmony.Patch(original, prefix: new HarmonyMethod(prefix));
 
@@ -74,7 +68,7 @@ public class PlayerSyncPatch : ModCompatibilityPatch
     // Skips the original entirely when sender couldn't be resolved, instead of letting it
     // NullReferenceException on sender.Lookup. Mirrors AmmoSync's own (correct) null-check.
     [HarmonyWrapSafe]
-    private static bool StaminaSync__HandlePacket__Prefix(byte[] data, SNet_Player? sender)
+    private static bool StaminaSync__HandlePacket__Prefix(SNet_Player? sender)
     {
         if (sender is not null)
             return true; // let the original run as normal

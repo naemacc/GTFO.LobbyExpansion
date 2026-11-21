@@ -6,7 +6,7 @@ using UnityEngine;
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
 [HarmonyPatch(typeof(ElevatorSeat))]
-public class ElevatorSeatPatch
+public static class ElevatorSeatPatch
 {
     private static int _frame;
 
@@ -33,7 +33,7 @@ public class ElevatorSeatPatch
 }
 
 [HarmonyPatch(typeof(ElevatorSeat._PreReleaseSequence_d__33))]
-public class ElevatorSeatPatchTwo
+public static class ElevatorSeatPatchTwo
 {
     // Pointer of the local player's seat, or IntPtr.Zero until we've seen it.
     //

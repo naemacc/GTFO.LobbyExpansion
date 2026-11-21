@@ -21,9 +21,8 @@ public static class PluginConfig
     private static readonly string _configPath = Path.Combine(BepInEx.Paths.ConfigPath, CONFIG_FILE_NAME);
     private static readonly string _configPathUserData = Path.Combine(BepInEx.Paths.ConfigPath, USER_CONFIG_FILE_NAME);
 
-    internal static byte MaxPlayers = DEFAULT_MAX_PLAYERS;
+    internal static byte MaxPlayers { get; private set; } = DEFAULT_MAX_PLAYERS;
 
-    private static LobbyExpansionPlayerCount _configPlayerCount = new();
     private static LobbyExpansionConfig _configUserData = new();
 
     internal static void Load()
@@ -38,8 +37,8 @@ public static class PluginConfig
         var json = File.ReadAllText(_configPathUserData);
         _configUserData = JsonSerializer.Deserialize<LobbyExpansionConfig>(json, _serializerOptions) ?? new();
 
-        _configUserData.SlotPermissions ??= new();
-        _configUserData.CustomExtraBotNames ??= new();
+        _configUserData.SlotPermissions ??= [];
+        _configUserData.CustomExtraBotNames ??= [];
         _configUserData.BioscanLetters ??= DEFAULT_BIOSCAN_LETTERS;
     }
 
@@ -47,22 +46,21 @@ public static class PluginConfig
     {
         if (!File.Exists(_configPath))
         {
-            return; // Do we even want/need to write this file?
-            //File.WriteAllText(_configPath, JsonSerializer.Serialize(_configPlayerCount));
+            return;
         }
 
         var json = File.ReadAllText(_configPath);
-        _configPlayerCount = JsonSerializer.Deserialize<LobbyExpansionPlayerCount>(json, _serializerOptions) ?? new();
+        var configPlayerCount = JsonSerializer.Deserialize<LobbyExpansionPlayerCount>(json, _serializerOptions) ?? new();
 
-        if (_configPlayerCount.MaxPlayers < 4)
+        if (configPlayerCount.MaxPlayers < 4)
         {
             L.Error("ConfigFile: MaxPlayers must be greater or equal to '4'!");
             MaxPlayers = DEFAULT_MAX_PLAYERS;
             return;
         }
 
-        L.Info($"Loaded custom player count from config file: {MaxPlayers} (default) -> {_configPlayerCount.MaxPlayers} (config)");
-        MaxPlayers = _configPlayerCount.MaxPlayers;
+        L.Info($"Loaded custom player count from config file: {MaxPlayers} (default) -> {configPlayerCount.MaxPlayers} (config)");
+        MaxPlayers = configPlayerCount.MaxPlayers;
     }
 
     private static void SaveUserData()
@@ -109,7 +107,7 @@ public static class PluginConfig
     {
         var letters = _configUserData.BioscanLetters;
 
-        if (letters != null && letters.Count > 0 && index >= 0 && index < letters.Count)
+        if (letters is not null && letters.Count > 0 && index >= 0 && index < letters.Count)
             return letters[index];
 
         if (index < DEFAULT_BIOSCAN_LETTERS.Count)
@@ -122,7 +120,7 @@ public static class PluginConfig
 
     public static string[] GetBioscanLetters()
     {
-        if (_bioscanLettersCache != null)
+        if (_bioscanLettersCache is not null)
             return _bioscanLettersCache;
 
         _bioscanLettersCache = new string[MaxPlayers];

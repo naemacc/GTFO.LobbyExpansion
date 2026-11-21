@@ -33,10 +33,10 @@ public static class PlayerManagerPatch
         L.Verbose($"{nameof(PlayerManagerPatch)}::{nameof(Awake__Postfix)}");
         L.Assert(__instance != null, "__instance was null");
         L.Assert(
-            __instance!.BotAIData.PositionReservations.Length == PluginConfig.MaxPlayers,
+            __instance.BotAIData.PositionReservations.Length == PluginConfig.MaxPlayers,
             $"{nameof(__instance.BotAIData.PositionReservations)} was {__instance.BotAIData.PositionReservations.Length} when the manual patch should have set it to {PluginConfig.MaxPlayers}.");
         L.Assert(
-            __instance!.BotAIData.ObjectReservations.Length == PluginConfig.MaxPlayers,
+            __instance.BotAIData.ObjectReservations.Length == PluginConfig.MaxPlayers,
             $"{nameof(__instance.BotAIData.ObjectReservations)} was {__instance.BotAIData.ObjectReservations.Length} when the manual patch should have set it to {PluginConfig.MaxPlayers}.");
 
         for (var i = 4; i < PluginConfig.MaxPlayers; i++)
@@ -55,10 +55,10 @@ public static class PlayerManagerPatch
         L.Assert(__instance != null, "__instance was null");
 
         L.Verbose("Fixing available spawnpoints...");
-        FixAvailableSpawnpoints(__instance!);
+        FixAvailableSpawnpoints(__instance);
 
         L.Verbose("Fixing player colors...");
-        FixPlayerColors(__instance!);
+        FixPlayerColors(__instance);
     }
 
     private static readonly Random _random = new(690420);
@@ -78,7 +78,7 @@ public static class PlayerManagerPatch
             Color.white,
         };
 
-        var original = __instance!.m_playerColors;
+        var original = __instance.m_playerColors;
         __instance.m_playerColors = new Il2CppStructArray<Color>(PluginConfig.MaxPlayers);
 
         for (var i = 0; i < PluginConfig.MaxPlayers; i++)

@@ -3,6 +3,8 @@ using Player;
 
 namespace GTFO.LobbyExpansion.Patches.Manual;
 
+#pragma warning disable S125
+
 public class PlayerManagerManualPatch : ManualPatch
 {
     protected override Type TargetType { get; } = typeof(PlayerManager);

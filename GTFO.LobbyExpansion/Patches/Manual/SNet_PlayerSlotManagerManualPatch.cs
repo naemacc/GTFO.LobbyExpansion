@@ -3,6 +3,9 @@ using SNetwork;
 
 namespace GTFO.LobbyExpansion.Patches.Manual;
 
+#pragma warning disable S101
+#pragma warning disable S125
+
 public class SNet_PlayerSlotManagerManualPatch : ManualPatch
 {
     protected override Type TargetType { get; } = typeof(SNet_PlayerSlotManager);

@@ -3,12 +3,14 @@ using SNetwork;
 
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
+#pragma warning disable S101
+
 [HarmonyPatch(typeof(SNet_LobbyManager))]
-public class SNet_LobbyManagerPatch
+public static class SNet_LobbyManagerPatch
 {
     [HarmonyPatch(nameof(SNet_LobbyManager.CreateLobby))]
     [HarmonyPrefix]
-    public static bool CreateLobby__Prefix(SNet_LobbySettings settings, bool leaveSessionHub)
+    public static bool CreateLobby__Prefix(SNet_LobbySettings settings)
     {
         L.LogExecutingMethod();
 

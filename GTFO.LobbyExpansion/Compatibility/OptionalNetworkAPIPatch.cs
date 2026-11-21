@@ -6,6 +6,8 @@ using System.Reflection;
 
 namespace GTFO.LobbyExpansion.Compatibility;
 
+#pragma warning disable S101
+
 /**
  * OptionalNetworkAPI's ModManager tracks every player/bot in two static Dictionary<ulong,
  * PlayerInfo> fields (_players, _bots), keyed by SNet_Player.Lookup. OnAddPlayer() uses plain
@@ -51,7 +53,7 @@ namespace GTFO.LobbyExpansion.Compatibility;
  * them and the original method's ContainsKey early-return is a legitimate idempotency guard we
  * don't want to defeat for a normal re-announce of an already-connected player.
  */
-public class OptionalNetworkAPIPatch : ModCompatibilityPatch
+public class OptionalNetworkAPIPatch : IModCompatibilityPatch
 {
     public const string PluginGuid = "Dinorush.OptionalNetworkAPI";
 
@@ -62,30 +64,23 @@ public class OptionalNetworkAPIPatch : ModCompatibilityPatch
 
     private OptionalNetworkAPIPatch() { }
 
-    public override bool ShouldApply()
+    public bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
     }
 
-    public override void Apply(Harmony harmony)
+    public void Apply(Harmony harmony)
     {
         var pluginInstance = BepInExUtil.GetPluginInstance(PluginGuid);
         var assembly = pluginInstance.GetType().Assembly;
 
         var modManagerType = ReflectionUtil.GetRequiredTypeByName("ModManager", assembly);
 
-        _playersField = AccessTools.Field(modManagerType, "_players");
-        if (_playersField is null)
-            throw new Exception($"Unable to find {modManagerType.FullName}._players.");
+        _playersField = AccessTools.Field(modManagerType, "_players") ?? throw new MissingFieldException($"Unable to find {modManagerType.FullName}._players.");
 
-        _botsField = AccessTools.Field(modManagerType, "_bots");
-        if (_botsField is null)
-            throw new Exception($"Unable to find {modManagerType.FullName}._bots.");
+        _botsField = AccessTools.Field(modManagerType, "_bots") ?? throw new MissingFieldException($"Unable to find {modManagerType.FullName}._bots.");
 
-        var onAddPlayer = AccessTools.Method(modManagerType, "OnAddPlayer");
-        if (onAddPlayer is null)
-            throw new Exception($"Unable to find {modManagerType.FullName}.OnAddPlayer(SNet_Player).");
-
+        var onAddPlayer = AccessTools.Method(modManagerType, "OnAddPlayer") ?? throw new MissingMethodException($"Unable to find {modManagerType.FullName}.OnAddPlayer(SNet_Player).");
         var prefix = AccessTools.Method(typeof(OptionalNetworkAPIPatch), nameof(OnAddPlayer_Prefix));
         harmony.Patch(onAddPlayer, prefix: new HarmonyMethod(prefix));
 

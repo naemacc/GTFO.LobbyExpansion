@@ -2,6 +2,7 @@
 
 using Il2CppInterop.Common;
 using Il2CppInterop.Runtime.InteropTypes;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -14,17 +15,13 @@ public static class Memory
 {
     private const long DefaultBlockScanSize = 3000;
 
-    private record Signature(byte[] Bytes, char[] Mask);
-
-    // private static readonly ProcessModule GameAssemblyModule = Process.GetCurrentProcess()
-    //     .Modules.OfType<ProcessModule>()
-    //     .Single(x => x.ModuleName is "GameAssembly.dll");
+    private sealed record Signature(byte[] Bytes, char[] Mask);
 
     public static nint GetIl2CppConstructorAddress(Type type, params Type[] parameterTypes)
     {
         var constructorInfo = type.GetConstructor(BindingFlags.Public | BindingFlags.Instance, parameterTypes);
 
-        if (constructorInfo == null)
+        if (constructorInfo is null)
         {
             var formattedParameterTypeNames = parameterTypes.Select(x => x.FullName?.ToString() ?? "null");
             throw new MissingMethodException($"Could not find constructor for {type.FullName} with {parameterTypes.Length} parameters ({formattedParameterTypeNames}).");
@@ -40,14 +37,14 @@ public static class Memory
 
     public static nint GetIl2CppMethodAddress(Type type, string methodName)
     {
-        return GetIl2CppMethodAddress(type, methodName, Array.Empty<Type>());
+        return GetIl2CppMethodAddress(type, methodName, []);
     }
 
     public static nint GetIl2CppMethodAddress(Type type, string methodName, Type[] parameterTypes)
     {
         var methodInfo = type.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
 
-        if (methodInfo == null)
+        if (methodInfo is null)
         {
             var extraInfo = "";
 
@@ -62,7 +59,7 @@ public static class Memory
 
     public static nint GetIl2CppMethodAddress<T>(string methodName) where T : Il2CppObjectBase
     {
-        return GetIl2CppMethodAddress<T>(methodName, Array.Empty<Type>());
+        return GetIl2CppMethodAddress<T>(methodName, []);
     }
 
     public static nint GetIl2CppMethodAddress<T>(string methodName, Type[] parameterTypes) where T : Il2CppObjectBase
@@ -72,24 +69,14 @@ public static class Memory
 
     public static nint GetIl2CppMethodAddress(Type type, MethodBase methodBase)
     {
-        var methodInfoPtrField = Il2CppInteropUtils.GetIl2CppMethodInfoPointerFieldForGeneratedMethod(methodBase);
+        var methodInfoPtrField = Il2CppInteropUtils.GetIl2CppMethodInfoPointerFieldForGeneratedMethod(methodBase) ?? throw new MissingFieldException($"Could not find IL2CPP method info pointer field for method {methodBase} of {type.FullName ?? type.Name}.");
 
-        if (methodInfoPtrField == null)
-            throw new MissingFieldException($"Could not find IL2CPP method info pointer field for method {methodBase} of {type.FullName ?? type.Name}.");
+        var methodInfoPtr = methodInfoPtrField.GetValue(null) ?? throw new InvalidOperationException($"Method info pointer field for method {methodBase} of {type.FullName ?? type.Name} was null.");
 
-        var methodInfoPtr = methodInfoPtrField.GetValue(null);
+        if (methodInfoPtr is not IntPtr methodInfoPointer)
+            throw new InvalidOperationException($"Method info pointer field for method {methodBase} of {type.FullName ?? type.Name} did not contain an IntPtr.");
 
-        if (methodInfoPtr == null)
-            throw new NullReferenceException($"Method info pointer field for method {methodBase} of {type.FullName ?? type.Name} was null.");
-
-        nint methodPointer;
-
-        unsafe
-        {
-            methodPointer = *(IntPtr*)(IntPtr)methodInfoPtr;
-        }
-
-        return methodPointer;
+        return Marshal.ReadIntPtr(methodInfoPointer);
     }
 
     public static nint GetIl2CppMethodAddress<T>(MethodBase methodBase) where T : Il2CppObjectBase
@@ -99,11 +86,7 @@ public static class Memory
 
     public static nint FindSignatureInIl2CppMethod(nint methodPointer, string signature, long? blockSize)
     {
-        var sig = ConvertAobToSignature(signature);
-
-        if (sig == null)
-            throw new ArgumentException($"{nameof(signature)} was an invalid signature.");
-
+        var sig = ConvertAobToSignature(signature) ?? throw new ArgumentException($"{nameof(signature)} was an invalid signature.");
         return FindSignatureInBlock(methodPointer, blockSize ?? DefaultBlockScanSize, sig.Bytes, sig.Mask);
     }
 
@@ -123,18 +106,18 @@ public static class Memory
         var appliedProtection = Win32.VirtualProtect(
             address,
             new IntPtr(bytes.Length),
-            Win32.MemoryProtection.ExecuteReadWrite,
+            Win32.MemoryProtections.ExecuteReadWrite,
             out var oldProtection);
 
         if (!appliedProtection)
-            throw new Exception($"VirtualProtect failed for address {address}.");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), $"VirtualProtect failed for address {address}.");
 
         var restoredProtection = false;
 
         try
         {
 #if DEBUG
-            L.Verbose($"Patching {address.ToString("X")} with {string.Join(", ", bytes.Select(x => x.ToString("X")))}");
+            L.Verbose($"Patching {address:X} with {string.Join(", ", bytes.Select(x => x.ToString("X")))}");
 #endif
 
             // TODO: Good idea?
@@ -163,23 +146,26 @@ public static class Memory
         }
 
         if (!restoredProtection)
-            throw new Exception($"VirtualProtect failed to restore protection for address {address}.");
+            throw new Win32Exception(Marshal.GetLastWin32Error(), $"VirtualProtect failed to restore protection for address {address}.");
     }
 
-    private static unsafe nint FindSignatureInBlock(nint block, long blockSize, byte[] pattern, char[] mask)
+    private static nint FindSignatureInBlock(nint block, long blockSize, byte[] pattern, char[] mask)
     {
         for (long address = 0; address < blockSize; address++)
         {
             var found = true;
             for (uint offset = 0; offset < mask.Length; offset++)
-                if (*(byte*)(address + block + offset) != pattern[offset] && mask[offset] != '?')
+            {
+                var byteAddress = block + (nint)address + (nint)offset;
+                if (Marshal.ReadByte(byteAddress) != pattern[offset] && mask[offset] != '?')
                 {
                     found = false;
                     break;
                 }
+            }
 
             if (found)
-                return (nint)(address + block);
+                return block + (nint)address;
         }
 
         return 0;

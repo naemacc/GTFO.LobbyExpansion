@@ -15,7 +15,7 @@ public abstract class ManualPatch
 
         foreach (var patch in Patches)
         {
-            var parameterTypes = patch.ParameterTypes ?? Array.Empty<Type>();
+            var parameterTypes = patch.ParameterTypes ?? [];
             var methodPointer = patch.Method is ".ctor" or "ctor"
                 ? Memory.GetIl2CppConstructorAddress(TargetType, parameterTypes)
                 : Memory.GetIl2CppMethodAddress(TargetType, patch.Method, parameterTypes);
@@ -31,13 +31,13 @@ public abstract class ManualPatch
 
             if (PatchedAddresses.Contains(patchAddress))
             {
-                var message = $"Patching the same address {patchAddress.ToString("X")}! Something is wrong!";
+                var message = $"Patching the same address {patchAddress:X}! Something is wrong!";
                 L.Fatal(message);
                 yield return new PatchingException(message, this);
                 continue;
             }
 
-            L.Verbose($"Applying \"{patch.Description}\" patch at {patchAddress.ToString("X")}");
+            L.Verbose($"Applying \"{patch.Description}\" patch at {patchAddress:X}");
             Memory.PatchMemory(patchAddress, patch.Bytes);
             PatchedAddresses.Add(patchAddress);
         }
@@ -52,7 +52,7 @@ public abstract class ManualPatch
         if (count <= 0)
             throw new ArgumentException("Count must be greater than 0.", nameof(count));
 
-        return Enumerable.Repeat(NOP, count).ToArray();
+        return [.. Enumerable.Repeat(NOP, count)];
     }
 
     protected record Patch
@@ -61,8 +61,8 @@ public abstract class ManualPatch
         public string Description { get; init; } = "";
         public string Pattern { get; init; } = "";
         public int Offset { get; init; }
-        public byte[] Bytes { get; init; } = Array.Empty<byte>();
+        public byte[] Bytes { get; init; } = [];
         public long? ScanSize { get; init; }
-        public Type[]? ParameterTypes { get; init; } = Array.Empty<Type>();
+        public Type[]? ParameterTypes { get; init; } = [];
     }
 }

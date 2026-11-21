@@ -9,7 +9,7 @@ using System.Reflection.Emit;
 
 namespace GTFO.LobbyExpansion.Compatibility;
 
-public class ChatterRebornPatch : ModCompatibilityPatch
+public class ChatterRebornPatch : IModCompatibilityPatch
 {
     public const string PluginGuid = "CHTR";
 
@@ -40,12 +40,12 @@ public class ChatterRebornPatch : ModCompatibilityPatch
 
     private ChatterRebornPatch() { }
 
-    public override bool ShouldApply()
+    public bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
     }
 
-    public override void Apply(Harmony harmony)
+    public void Apply(Harmony harmony)
     {
         try
         {
@@ -109,6 +109,8 @@ public class ChatterRebornPatch : ModCompatibilityPatch
         }
     }
 
+    // These private members are the compatibility contract with the loaded third-party plugin.
+#pragma warning disable S3011
     private void ResolveMembers()
     {
         _m_playerVisiblityField = AccessTools.Field(_enemyDramaBehaviorType, "m_playerVisiblity");
@@ -158,11 +160,12 @@ public class ChatterRebornPatch : ModCompatibilityPatch
             BindingFlags.Public | BindingFlags.Static);
         RequireMember(_aggressiveEnemiesField, nameof(_aggressiveEnemiesField));
     }
+#pragma warning restore S3011
 
     private static void RequireMember(object? member, string memberName)
     {
         if (member is null)
-            throw new Exception($"Unable to find {memberName}; ChatterReborn's internals may have changed.");
+            throw new MissingMemberException($"Unable to find {memberName}; ChatterReborn's internals may have changed.");
     }
 
     protected void ApplyPatches(Harmony harmony)
@@ -177,9 +180,8 @@ public class ChatterRebornPatch : ModCompatibilityPatch
     // Patched manually since we don't have compile-time references to ChatterReborn's types.
     private static void PatchTranspiler(Harmony harmony, Type? targetType, string methodName, string transpilerName)
     {
-        var original = AccessTools.Method(targetType, methodName);
-        if (original is null)
-            throw new Exception($"Unable to find {targetType?.FullName}::{methodName}().");
+        var original = AccessTools.Method(targetType, methodName)
+            ?? throw new MissingMethodException($"Unable to find {targetType?.FullName}::{methodName}().");
 
         var transpiler = new HarmonyMethod(AccessTools.Method(typeof(ChatterRebornPatch), transpilerName));
         harmony.Patch(original, transpiler: transpiler);
@@ -188,9 +190,8 @@ public class ChatterRebornPatch : ModCompatibilityPatch
     // Patched manually since we don't have compile-time references to ChatterReborn's types.
     private static void PatchMethod(Harmony harmony, Type? targetType, string methodName, string? prefix = null, string? postfix = null)
     {
-        var original = AccessTools.Method(targetType, methodName);
-        if (original is null)
-            throw new Exception($"Unable to find {targetType?.FullName}::{methodName}().");
+        var original = AccessTools.Method(targetType, methodName)
+            ?? throw new MissingMethodException($"Unable to find {targetType?.FullName}::{methodName}().");
 
         var prefixMethod = prefix is null ? null : new HarmonyMethod(AccessTools.Method(typeof(ChatterRebornPatch), prefix));
         var postfixMethod = postfix is null ? null : new HarmonyMethod(AccessTools.Method(typeof(ChatterRebornPatch), postfix));
@@ -322,7 +323,7 @@ public class ChatterRebornPatch : ModCompatibilityPatch
 
         if (matchIndices.Count != 1)
         {
-            throw new Exception(
+            throw new InvalidOperationException(
                 $"Expected exactly 1 `ldc.i4.4; newarr` pattern in OnOrderBackToBioScanPrisoner(), found {matchIndices.Count}. " +
                 "ChatterReborn's compiled IL may have changed - refusing to guess which constant is the array size.");
         }

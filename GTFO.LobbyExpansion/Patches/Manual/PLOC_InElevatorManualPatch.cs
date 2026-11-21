@@ -2,6 +2,8 @@ using GTFO.LobbyExpansion.Util;
 
 namespace GTFO.LobbyExpansion.Patches.Manual;
 
+#pragma warning disable S101
+
 public class PLOC_InElevatorManualPatch : ManualPatch
 {
     protected override Type TargetType { get; } = typeof(PLOC_InElevator);

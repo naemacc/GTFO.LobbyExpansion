@@ -16,7 +16,7 @@ internal static class L
         {
             var message = $"ASSERTION FAILED: {Format(data)}";
             Fatal(message);
-            throw new ApplicationException(message);
+            throw new InvalidOperationException(message);
         }
     }
 
@@ -51,7 +51,7 @@ internal static class L
     {
         var executingMethod = new StackFrame(1, false).GetMethod();
 
-        if (executingMethod == null)
+        if (executingMethod is null)
         {
             Error("COULD NOT LOG EXECUTING METHOD. THIS SHOULD NOT HAPPEN.");
             return;

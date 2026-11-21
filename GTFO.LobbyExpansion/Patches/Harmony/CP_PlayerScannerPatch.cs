@@ -4,6 +4,8 @@ using Il2CppInterop.Runtime.InteropTypes.Arrays;
 
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
+#pragma warning disable S101
+
 [HarmonyPatch(typeof(CP_PlayerScanner))]
 public static class CP_PlayerScannerPatch
 {

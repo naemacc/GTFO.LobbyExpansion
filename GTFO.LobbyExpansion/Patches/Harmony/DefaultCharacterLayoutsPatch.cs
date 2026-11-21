@@ -3,15 +3,13 @@ using HarmonyLib;
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
 [HarmonyPatch(typeof(DefaultCharacterLayouts))]
-public class DefaultCharacterLayoutsPatch
+public static class DefaultCharacterLayoutsPatch
 {
     [HarmonyPatch(nameof(DefaultCharacterLayouts.GetDefaultVanityItems))]
     [HarmonyPriority(Priority.High)] // Priority high to fix some errors with StrikerMode.
     [HarmonyPrefix]
     public static bool GetDefaultVanityItems__Prefix(ref int characterIndex)
     {
-        //L.LogExecutingMethod($"{nameof(characterIndex)}: {characterIndex}");
-
         if (characterIndex > 3)
         {
             characterIndex %= 4;

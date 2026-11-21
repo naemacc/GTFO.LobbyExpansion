@@ -4,6 +4,9 @@ using PlayerCoverage;
 
 namespace GTFO.LobbyExpansion.Patches.Manual;
 
+#pragma warning disable S101
+#pragma warning disable S125
+
 public class PlayerCoverageDataSet_NodeManualPatch : ManualPatch
 {
     protected override Type TargetType { get; } = typeof(PlayerCoverageSystem.PlayerCoverageDataSet_Node);

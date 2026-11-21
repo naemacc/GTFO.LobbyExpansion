@@ -4,8 +4,10 @@ using SNetwork;
 
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
+#pragma warning disable S101
+
 [HarmonyPatch(typeof(CM_PageLoadout.__c__DisplayClass38_1))]
-public class CM_PageLoadoutDisplayClassPatch
+public static class CM_PageLoadoutDisplayClassPatch
 {
     [HarmonyPatch(nameof(CM_PageLoadout.__c__DisplayClass38_1._ShowPermissionWindow_b__1))]
     public static void Prefix(CM_PageLoadout.__c__DisplayClass38_1 __instance)

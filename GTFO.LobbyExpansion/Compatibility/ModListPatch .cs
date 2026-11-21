@@ -42,7 +42,7 @@ namespace GTFO.LobbyExpansion.Compatibility;
  * expected ldloc/ldc.i4.4/compare pattern isn't found exactly once, this throws rather than
  * guessing, since ModList's compiled IL could change between versions.
  */
-public class ModListPatch : ModCompatibilityPatch
+public class ModListPatch : IModCompatibilityPatch
 {
     public const string PluginGuid = "Localia.ModList";
 
@@ -52,12 +52,12 @@ public class ModListPatch : ModCompatibilityPatch
 
     private ModListPatch() { }
 
-    public override bool ShouldApply()
+    public bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
     }
 
-    public override void Apply(Harmony harmony)
+    public void Apply(Harmony harmony)
     {
         try
         {
@@ -80,10 +80,7 @@ public class ModListPatch : ModCompatibilityPatch
 
     private void ExpandUiModButtons()
     {
-        var field = AccessTools.Field(_modListManagerType, "UI_ModButtons");
-        if (field is null)
-            throw new Exception($"Unable to find {_modListManagerType?.FullName}.UI_ModButtons.");
-
+        var field = AccessTools.Field(_modListManagerType, "UI_ModButtons") ?? throw new MissingFieldException($"Unable to find {_modListManagerType?.FullName}.UI_ModButtons.");
         var oldArray = (Array)field.GetValue(null)!;
 
         if (oldArray.Length >= PluginConfig.MaxPlayers)
@@ -105,10 +102,7 @@ public class ModListPatch : ModCompatibilityPatch
     // Patched manually since we don't have compile-time references to ModList's types.
     private static void PatchTranspiler(Harmony harmony, Type? targetType, string methodName)
     {
-        var original = AccessTools.Method(targetType, methodName);
-        if (original is null)
-            throw new Exception($"Unable to find {targetType?.FullName}::{methodName}().");
-
+        var original = AccessTools.Method(targetType, methodName) ?? throw new MissingMethodException($"Unable to find {targetType?.FullName}::{methodName}().");
         var transpiler = new HarmonyMethod(AccessTools.Method(typeof(ModListPatch), nameof(HardcodedFour_Transpiler)));
         harmony.Patch(original, transpiler: transpiler);
     }
@@ -140,7 +134,7 @@ public class ModListPatch : ModCompatibilityPatch
 
         if (matchIndices.Count != 1)
         {
-            throw new Exception(
+            throw new InvalidOperationException(
                 $"Expected exactly 1 loop-bound pattern (ldloc; ldc.i4.4; compare/branch), found {matchIndices.Count}. " +
                 "ModList's compiled IL may have changed - refusing to guess which constant is the loop bound.");
         }

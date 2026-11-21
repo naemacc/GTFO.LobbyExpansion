@@ -14,9 +14,9 @@ public static class ElevatorRidePatch
     [HarmonyPatch(nameof(ElevatorRide.StartPreReleaseSequence))]
     [HarmonyPrefix]
     [HarmonyWrapSafe]
-    public static bool StartPreReleaseSequence__Prefix(Il2CppSystem.Action onDone)
+    public static bool StartPreReleaseSequence__Prefix()
     {
-        L.LogExecutingMethod();
+        L.LogExecutingMethod(nameof(ElevatorRide.StartPreReleaseSequence));
         return true;
     }
 
@@ -25,7 +25,7 @@ public static class ElevatorRidePatch
     [HarmonyWrapSafe]
     public static bool Cleanup__Prefix()
     {
-        L.LogExecutingMethod();
+        L.LogExecutingMethod(nameof(ElevatorRide.Cleanup));
         return true;
     }
 

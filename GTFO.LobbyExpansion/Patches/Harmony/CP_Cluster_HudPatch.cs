@@ -3,6 +3,8 @@ using HarmonyLib;
 
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
+#pragma warning disable S101
+
 [HarmonyPatch(typeof(CP_Cluster_Hud))]
 public static class CP_Cluster_HudPatch
 {

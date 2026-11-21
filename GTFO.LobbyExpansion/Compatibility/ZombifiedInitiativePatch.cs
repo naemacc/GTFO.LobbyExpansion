@@ -69,7 +69,7 @@ namespace GTFO.LobbyExpansion.Compatibility;
  * a future version, this logs an error and sentry mode simply goes back to being host-only
  * again - it does not affect the orphaned-ZombieComp fix above, which is applied separately.
  */
-public class ZombifiedInitiativePatch : ModCompatibilityPatch
+public class ZombifiedInitiativePatch : IModCompatibilityPatch
 {
     public const string PluginGuid = "com.hirnukuono.zombified_initiative";
 
@@ -83,26 +83,23 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
     private const int SentryModeFunc = 6; // ZombifiedInitiative's own ZINetInfo.FUNC uses 0-5; 6 is unused.
     private const int AllBotsSlotSentinel = 8; // matches ZombifiedInitiative's own "AllBots" convention.
 
-    private Type? _zombifiedInitiativeType;
-    private Type? _zinetInfoType;
     private ConstructorInfo? _zinetInfoCtor;
     private FieldInfo? _botTableField;
     private FieldInfo? _allowedMoveField;
     private FieldInfo? _followActionField;
     private FieldInfo? _travelActionField;
-    private Type? _networkApiType;
     private MethodInfo? _invokeEventMethod;
 
     private static Dictionary<string, bool>? _allowedMoveSnapshot;
 
     private ZombifiedInitiativePatch() { }
 
-    public override bool ShouldApply()
+    public bool ShouldApply()
     {
         return BepInExUtil.IsPluginLoaded(PluginGuid);
     }
 
-    public override void Apply(Harmony harmony)
+    public void Apply(Harmony harmony)
     {
         var pluginInstance = BepInExUtil.GetPluginInstance(PluginGuid);
         var assembly = pluginInstance.GetType().Assembly;
@@ -130,7 +127,7 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
     protected void ApplyPatches(Harmony harmony)
     {
         // Patched manually since we don't have a reference to the ZombieComp type at compile time.
-        var original = AccessTools.Method(_zombieCompType, "Update") ?? throw new Exception($"Unable to find {nameof(_zombieCompType)}::Update().");
+        var original = AccessTools.Method(_zombieCompType, "Update") ?? throw new MissingMethodException($"Unable to find {nameof(_zombieCompType)}::Update().");
         var prefix = AccessTools.Method(typeof(ZombifiedInitiativePatch), nameof(ZombieComp__Update__Prefix));
         harmony.Patch(original, prefix: new HarmonyMethod(prefix));
 
@@ -187,19 +184,19 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
     // depends on, not its own assembly, so it's located across the whole AppDomain instead.
     private void ApplySentryModeNetworkingFix(Harmony harmony, Assembly zombifiedAssembly)
     {
-        _zombifiedInitiativeType = ReflectionUtil.GetRequiredTypeByName("ZombifiedInitiative", zombifiedAssembly);
+        var zombifiedInitiativeType = ReflectionUtil.GetRequiredTypeByName("ZombifiedInitiative", zombifiedAssembly);
 
-        _botTableField = AccessTools.Field(_zombifiedInitiativeType, "BotTable");
+        _botTableField = AccessTools.Field(zombifiedInitiativeType, "BotTable");
         RequireMember(_botTableField, nameof(_botTableField));
 
-        _zinetInfoType = _zombifiedInitiativeType.GetNestedType("ZINetInfo", BindingFlags.Public | BindingFlags.NonPublic);
-        if (_zinetInfoType is null)
-            throw new Exception("Unable to find ZombifiedInitiative.ZINetInfo.");
+        // ZINetInfo is intentionally a private nested type required by the network compatibility patch.
+#pragma warning disable S3011
+        var zinetInfoType = zombifiedInitiativeType.GetNestedType("ZINetInfo", BindingFlags.Public | BindingFlags.NonPublic);
+#pragma warning restore S3011
+        if (zinetInfoType is null)
+            throw new TypeLoadException("Unable to find ZombifiedInitiative.ZINetInfo.");
 
-        _zinetInfoCtor = _zinetInfoType.GetConstructor([typeof(int), typeof(int), typeof(int), typeof(int), typeof(int)]);
-        if (_zinetInfoCtor is null)
-            throw new Exception("Unable to find ZINetInfo(int,int,int,int,int) constructor.");
-
+        _zinetInfoCtor = zinetInfoType.GetConstructor([typeof(int), typeof(int), typeof(int), typeof(int), typeof(int)]) ?? throw new MissingMethodException("Unable to find ZINetInfo(int,int,int,int,int) constructor.");
         _allowedMoveField = AccessTools.Field(_zombieCompType, "allowedmove");
         RequireMember(_allowedMoveField, nameof(_allowedMoveField));
 
@@ -209,13 +206,10 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
         _travelActionField = AccessTools.Field(_zombieCompType, "travelaction");
         RequireMember(_travelActionField, nameof(_travelActionField));
 
-        _networkApiType = AppDomain.CurrentDomain.GetAssemblies()
+        var networkApiType = AppDomain.CurrentDomain.GetAssemblies()
             .Select(a => a.GetType("GTFO.API.NetworkAPI"))
-            .FirstOrDefault(t => t is not null);
-        if (_networkApiType is null)
-            throw new Exception("Unable to find GTFO.API.NetworkAPI in any loaded assembly.");
-
-        var invokeEventGeneric = _networkApiType
+            .FirstOrDefault(t => t is not null) ?? throw new TypeLoadException("Unable to find GTFO.API.NetworkAPI in any loaded assembly.");
+        var invokeEventGeneric = networkApiType
             .GetMethods(BindingFlags.Public | BindingFlags.Static)
             .Where(m => m.Name == "InvokeEvent" && m.IsGenericMethodDefinition)
             .FirstOrDefault(m =>
@@ -229,8 +223,8 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
                 return parameters.Length == 3
                     && parameters[0].ParameterType == typeof(string)
                     && parameters[2].ParameterType == typeof(SNet_ChannelType);
-            }) ?? throw new Exception("Unable to find GTFO.API.NetworkAPI.InvokeEvent<T>(string, T, SNet_ChannelType).");
-        _invokeEventMethod = invokeEventGeneric.MakeGenericMethod(_zinetInfoType);
+            }) ?? throw new MissingMethodException("Unable to find GTFO.API.NetworkAPI.InvokeEvent<T>(string, T, SNet_ChannelType).");
+        _invokeEventMethod = invokeEventGeneric.MakeGenericMethod(zinetInfoType);
 
         var zombieControllerType = ReflectionUtil.GetRequiredTypeByName("ZombieController", zombifiedAssembly);
         var receiveZinetInfo = AccessTools.Method(zombieControllerType, "ReceiveZINetInfo");
@@ -250,7 +244,7 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
     private static void RequireMember(object? member, string memberName)
     {
         if (member is null)
-            throw new Exception($"Unable to find {memberName}; ZombifiedInitiative's internals may have changed.");
+            throw new MissingMemberException($"Unable to find {memberName}; ZombifiedInitiative's internals may have changed.");
     }
 
     // Component.GetComponent(Il2CppSystem.Type) returns a wrapper whose C# reflection type is
@@ -329,10 +323,8 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
     // ReceiveZINetInfo(ulong sender, ZombifiedInitiative.ZINetInfo netInfo). Renaming it (even
     // to the usual `_`/`_1` unused-parameter convention) would make Harmony unable to bind it
     // and fail to apply this patch.
-#pragma warning disable IDE0060
     [HarmonyWrapSafe]
-    private static void ReceiveZINetInfo_Postfix(ulong sender, object netInfo)
-#pragma warning restore IDE0060
+    private static void ReceiveZINetInfo_Postfix(object netInfo)
     {
         if (!SNet.IsMaster)
             return;
@@ -372,10 +364,8 @@ public class ZombifiedInitiativePatch : ModCompatibilityPatch
         var followAction = (PlayerBotActionBase?)Instance._followActionField!.GetValue(zombieComp);
         var travelAction = (PlayerBotActionBase?)Instance._travelActionField!.GetValue(zombieComp);
 
-        if (followAction is not null)
-            followAction.DescBase.Status = (StatusType)0;
+        followAction?.DescBase.Status = (StatusType)0;
 
-        if (travelAction is not null)
-            travelAction.DescBase.Status = (StatusType)0;
+        travelAction?.DescBase.Status = (StatusType)0;
     }
 }

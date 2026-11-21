@@ -3,6 +3,8 @@ using SNetwork;
 
 namespace GTFO.LobbyExpansion.Patches.Manual;
 
+#pragma warning disable S101
+
 public class SNet_SyncManagerManualPatch : ManualPatch
 {
     protected override Type TargetType { get; } = typeof(SNet_SyncManager);

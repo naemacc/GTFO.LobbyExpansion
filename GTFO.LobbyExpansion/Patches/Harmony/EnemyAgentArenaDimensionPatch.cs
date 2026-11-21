@@ -4,7 +4,7 @@ using HarmonyLib;
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
 [HarmonyPatch(typeof(EnemyAgent))]
-public class EnemyAgentArenaDimensionPatch
+public static class EnemyAgentArenaDimensionPatch
 {
     [HarmonyPatch(nameof(EnemyAgent.GetArenaDimension))]
     [HarmonyPrefix]

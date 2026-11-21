@@ -3,6 +3,7 @@ using GTFO.LobbyExpansion.Util;
 
 namespace GTFO.LobbyExpansion.Patches.Manual;
 
+#pragma warning disable S101
 public class CM_PageLoadoutDisplayClassManualPatch : ManualPatch
 {
     protected override Type TargetType { get; } = typeof(CM_PageLoadout.__c__DisplayClass38_1);

@@ -16,13 +16,7 @@ public static class BepInExUtil
             throw new InvalidOperationException($"Could not retrieve plugin info for plugin with GUID {pluginGuid}.");
         }
 
-        var instance = pluginInfo.Instance;
-
-        if (instance is null)
-        {
-            throw new InvalidOperationException($"Plugin with GUID {pluginGuid} had a null instance.");
-        }
-
+        var instance = pluginInfo.Instance ?? throw new InvalidOperationException($"Plugin with GUID {pluginGuid} had a null instance.");
         return instance;
     }
 }

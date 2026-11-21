@@ -4,6 +4,8 @@ using PlayerCoverage;
 
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
+#pragma warning disable S101
+
 [HarmonyPatch(typeof(PlayerCoverageSystem))]
 public static class PlayerCoverageSystemPatch
 {
@@ -20,7 +22,7 @@ public static class PlayerCoverageSystemPatch
         }
     }
 
-    [HarmonyPatch(nameof(PlayerCoverageSystem.GetCoverageKey), [typeof(int)])]
+    [HarmonyPatch(nameof(PlayerCoverageSystem.GetCoverageKey), typeof(int))]
     [HarmonyPrefix]
     public static bool GetCoverageKey__Prefix(ref int __result, int activeID)
     {
@@ -45,43 +47,6 @@ public static class PlayerCoverageSystemPatch
     }
 }
 
-//
-// ! WARNING WARNING WARNING !
-// TODO: This causes m_playerCoverage to be set to null? why?
-//       Converting to manual patch for now.
-//
-// [HarmonyPatch(typeof(PlayerCoverageSystem.PlayerCoverageDataSet_Node))]
-//
-// public static class PlayerCoverageDataSet_NodePatch
-// {
-//     [HarmonyPatch(MethodType.Constructor)]
-//     [HarmonyPostfix]
-//
-//     public static void Constructor__Postfix(PlayerCoverageSystem.PlayerCoverageDataSet_Node? __instance)
-//     {
-//         L.Verbose($"{nameof(PlayerCoverageDataSet_NodePatch)}::{nameof(Constructor__Postfix)}");
-//         L.Assert(__instance != null, "instance was null");
-//
-//         if (__instance!.m_coverageDatas.Length < PluginConfig.MaxPlayers)
-//         {
-//             L.Verbose($"Expanding m_coverageDatas size from {__instance.m_coverageDatas.Length} to {PluginConfig.MaxPlayers}.");
-//             __instance.m_coverageDatas = new Il2CppReferenceArray<PlayerCoverageSystem.PlayerCoverageData>(PluginConfig.MaxPlayers);
-//
-//             for (var i = 0; i < __instance.m_coverageDatas.Length; i++)
-//             {
-//                 L.Verbose($"Instantiating PlayerCoverageData at index #{i} in m_coverageDatas.");
-//                 __instance.m_coverageDatas[i] = new PlayerCoverageSystem.PlayerCoverageData();
-//             }
-//         }
-// #if DEBUG
-//         else
-//         {
-//             L.DebugWarning($"m_coverageDatas size was >= {nameof(PluginConfig.MaxPlayers)}?");
-//         }
-// #endif
-//     }
-// }
-
 // TODO: I have not actually seen SetupData get called in log yet... Is this working?
 [HarmonyPatch(typeof(PlayerCoverageSystem.PlayerCoverageDataSet_Portal))]
 
@@ -94,7 +59,7 @@ public static class PlayerCoverageDataSet_PortalPatch
     {
         L.Verbose($"{nameof(PlayerCoverageDataSet_PortalPatch)}::{nameof(SetupData__Postfix)}");
         L.Assert(__instance != null, "instance was null");
-        __instance!.m_coverageDatas = new Il2CppReferenceArray<PlayerCoverageSystem.PlayerCoverageData>(PluginConfig.MaxPlayers);
+        __instance.m_coverageDatas = new Il2CppReferenceArray<PlayerCoverageSystem.PlayerCoverageData>(PluginConfig.MaxPlayers);
 
         for (var i = 0; i < __instance.m_coverageDatas.Length; i++)
         {

@@ -3,7 +3,7 @@ using HarmonyLib;
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
 [HarmonyPatch(typeof(DiscordManager))]
-public class DiscordManagerPatch
+public static class DiscordManagerPatch
 {
     [HarmonyPatch(nameof(DiscordManager.GetCharacterNickname))]
     [HarmonyPostfix]

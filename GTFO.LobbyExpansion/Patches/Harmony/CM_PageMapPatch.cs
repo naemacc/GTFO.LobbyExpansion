@@ -7,6 +7,8 @@ using UnityEngine;
 
 namespace GTFO.LobbyExpansion.Patches.Harmony;
 
+#pragma warning disable S101
+
 [HarmonyPatch(typeof(CM_PageMap))]
 public static class CM_PageMapPatch
 {

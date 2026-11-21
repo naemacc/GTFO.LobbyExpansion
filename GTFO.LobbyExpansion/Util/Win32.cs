@@ -5,7 +5,7 @@ namespace GTFO.LobbyExpansion.Util;
 public static class Win32
 {
     [Flags]
-    public enum MemoryProtection : uint
+    public enum MemoryProtections : uint
     {
         NoAccess = 0x01,
         ReadOnly = 0x02,
@@ -20,11 +20,26 @@ public static class Win32
         WriteCombineModifierflag = 0x400,
     }
 
-    [DllImport("kernel32.dll", SetLastError = true)]
+    [DllImport("kernel32.dll", EntryPoint = "VirtualProtect", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool VirtualProtect(
+    private static extern bool NativeVirtualProtect(
         IntPtr lpAddress,
         IntPtr dwSize,
-        MemoryProtection flNewProtect,
-        out MemoryProtection lpflOldProtect);
+        MemoryProtections flNewProtect,
+        out MemoryProtections lpflOldProtect);
+
+    public static bool VirtualProtect(
+        IntPtr lpAddress,
+        IntPtr dwSize,
+        MemoryProtections flNewProtect,
+        out MemoryProtections lpflOldProtect)
+    {
+        if (lpAddress == IntPtr.Zero)
+            throw new ArgumentException($"{nameof(lpAddress)} cannot be zero.", nameof(lpAddress));
+
+        if (dwSize.ToInt64() <= 0)
+            throw new ArgumentOutOfRangeException(nameof(dwSize), "The memory region size must be greater than zero.");
+
+        return NativeVirtualProtect(lpAddress, dwSize, flNewProtect, out lpflOldProtect);
+    }
 }
