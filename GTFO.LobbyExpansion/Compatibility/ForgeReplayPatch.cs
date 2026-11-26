@@ -12,7 +12,7 @@ public class ForgeReplayPatch : IModCompatibilityPatch
 {
     public const string PluginGuid = "NAinfini.ForgeReplay";
     private const string BUILD_PAGES = "BuildPages";
-    private static readonly bool VerboseLogging = true; // Set to true temporarily for per-patch diagnostics.
+    private static readonly bool VerboseLogging = false; // Set to true temporarily for per-patch diagnostics.
 
     public static ForgeReplayPatch Instance { get; } = new();
 
@@ -133,24 +133,9 @@ public class ForgeReplayPatch : IModCompatibilityPatch
         PatchStaticPlayerArrayAccesses(harmony, recorder);
         PatchPlayerBounds(harmony, recorder, "Tick");
         PatchPlayerBounds(harmony, recorder, "FullState");
-        PatchOptionalPlayerBounds(harmony, recorder, "NoteCharge");
 
         var puppeteer = ReflectionUtil.GetRequiredTypeByName("Puppeteer", assembly);
         PatchPlayerBounds(harmony, puppeteer, "SyncPlayers");
-
-        var park = AccessTools.Method(puppeteer, "Park");
-        if (park is not null)
-        {
-            try
-            {
-                harmony.Patch(park, prefix: new HarmonyMethod(AccessTools.Method(typeof(ForgeReplayPatch), nameof(Park_Logger))));
-                LogVerbose("Patched Puppeteer::Park() diagnostics.");
-            }
-            catch (Exception ex)
-            {
-                LogWarning($"Skipping Park logger: {ex.Message}");
-            }
-        }
 
         return puppeteer;
     }
@@ -258,11 +243,6 @@ public class ForgeReplayPatch : IModCompatibilityPatch
         PatchMethodSafe(harmony, runReport, "DownsOf", nameof(DownsArray_Transpiler));
         PatchMethodSafe(harmony, runReport, "AddDown", nameof(SlotUpperBound_Transpiler));
         PatchSlotMasks(harmony, runReport, "Finish");
-        PatchExceptionLogger(harmony, runReport, "Finish");
-        PatchExceptionLogger(harmony, runReport, "WeaponsOf");
-        PatchExceptionLogger(harmony, runReport, "DownsOf");
-        PatchExceptionLogger(harmony, runReport, "ObjectiveSpansOf");
-        PatchExceptionLogger(harmony, runReport, "Leave");
         PatchPlayerBounds(harmony, runReport, "Sample");
         PatchPlayerBounds(harmony, runReport, "TakeEvent");
         PatchSlotMasks(harmony, runReport, "TakeEvent");
@@ -328,9 +308,6 @@ public class ForgeReplayPatch : IModCompatibilityPatch
 
         var summary = ReflectionUtil.GetRequiredTypeByName("RunSummary", assembly);
         PatchPlayerBounds(harmony, summary, "Decode");
-
-        foreach (var name in new[] { "Mark", BUILD_PAGES, "BuildTeamTable", "BuildRating", "Statistics" })
-            PatchExceptionLogger(harmony, replayScreen, name);
     }
 
     // Resize static player arrays at allocation time; this avoids early type initialization and static-readonly field writes.
@@ -707,19 +684,6 @@ public class ForgeReplayPatch : IModCompatibilityPatch
         }
     }
 
-    private static void PatchOptionalPlayerBounds(Harmony harmony, Type type, string methodName)
-    {
-        var method = AccessTools.Method(type, methodName);
-        if (method is null)
-        {
-            LogVerbose($"Skipping optional method {type.FullName}::{methodName}(); it is not present in this version.");
-            return;
-        }
-
-        harmony.Patch(method, transpiler: new HarmonyMethod(AccessTools.Method(typeof(ForgeReplayPatch), nameof(PlayerBounds_Transpiler))));
-        LogVerbose($"Patched optional player bounds for {type.FullName}::{methodName}().");
-    }
-
     private static void PatchSlotMasks(Harmony harmony, Type type, string methodName)
     {
         var method = AccessTools.Method(type, methodName);
@@ -1088,39 +1052,6 @@ public class ForgeReplayPatch : IModCompatibilityPatch
     private static float GetRatingCardGaps() => (PluginConfig.MaxPlayers - 1) * 14f;
 
     [HarmonyWrapSafe]
-    private static IEnumerable<CodeInstruction> PlayerCardLayout_Transpiler(IEnumerable<CodeInstruction> instructions)
-    {
-        var getMax = AccessTools.Method(typeof(ForgeReplayPatch), nameof(GetMaxPlayers));
-        var codes = new List<CodeInstruction>(instructions);
-        var matches = new List<int>();
-
-        for (var i = 0; i < codes.Count - 1; i++)
-        {
-            if (codes[i].opcode != OpCodes.Ldc_I4_4 || IsCompareOrBranch(codes[i + 1].opcode))
-                continue;
-
-            for (var j = i + 1; j < codes.Count && j <= i + 4; j++)
-            {
-                if (codes[j].opcode == OpCodes.Sub)
-                {
-                    matches.Add(i);
-                    break;
-                }
-
-                if (codes[j].opcode == OpCodes.Br || codes[j].opcode == OpCodes.Br_S)
-                    break;
-            }
-        }
-
-        if (matches.Count != 1)
-            throw new InvalidOperationException($"Expected one four-player layout calculation in Forge Replay.ReplayScreen.Cards(), found {matches.Count}.");
-
-        codes[matches[0]].opcode = OpCodes.Call;
-        codes[matches[0]].operand = getMax;
-        return codes;
-    }
-
-    [HarmonyWrapSafe]
     private static IEnumerable<CodeInstruction> PlayerArrayAlloc_Transpiler(IEnumerable<CodeInstruction> instructions)
     {
         var getMax = AccessTools.Method(typeof(ForgeReplayPatch), nameof(GetMaxPlayers));
@@ -1339,7 +1270,7 @@ public class ForgeReplayPatch : IModCompatibilityPatch
         || opcode == OpCodes.Ble || opcode == OpCodes.Ble_S || opcode == OpCodes.Ble_Un || opcode == OpCodes.Ble_Un_S
         || opcode == OpCodes.Bgt || opcode == OpCodes.Bgt_S || opcode == OpCodes.Bgt_Un || opcode == OpCodes.Bgt_Un_S;
 
-    private const int CardsPerPage = 4;
+    private const int CardsPerPage = 8;
     private static MethodInfo? _followGetter;
     private static FieldInfo? _inRecordingField;
     private static int _cardPageFrame = -1;
@@ -1443,32 +1374,6 @@ public class ForgeReplayPatch : IModCompatibilityPatch
         return codes;
     }
 
-    private static void PatchExceptionLogger(Harmony harmony, Type type, string methodName)
-    {
-        var method = AccessTools.Method(type, methodName);
-        if (method is null)
-            return;
-
-        try
-        {
-            harmony.Patch(method, finalizer: new HarmonyMethod(AccessTools.Method(typeof(ForgeReplayPatch), nameof(LogException_Finalizer))));
-            LogVerbose($"Added exception diagnostics to {type.FullName}::{methodName}().");
-        }
-        catch (Exception ex)
-        {
-            LogWarning($"Skipping exception logger for {type.FullName}::{methodName}(): {ex.Message}");
-        }
-    }
-
-    // Diagnostic only: logs the exception and lets it continue unchanged.
-    private static Exception? LogException_Finalizer(Exception? __exception, MethodBase __originalMethod)
-    {
-        if (__exception is not null)
-            LogWarning($"{__originalMethod.DeclaringType?.Name}.{__originalMethod.Name} threw: {__exception}");
-
-        return __exception;
-    }
-
     // WatchPlayer only accepts slots 0..3 ("slot <= 3").
     [HarmonyWrapSafe]
     private static IEnumerable<CodeInstruction> SlotUpperBound_Transpiler(IEnumerable<CodeInstruction> instructions)
@@ -1550,15 +1455,6 @@ public class ForgeReplayPatch : IModCompatibilityPatch
 #pragma warning restore S3011
 
     private static void FillWithMinusOne(long[] array) => Array.Fill(array, -1L);
-
-    private static int _parkLogs;
-
-    // Diagnostic only: shows whether enemies are being hidden (forever=False) or removed (forever=True).
-    private static void Park_Logger(object[] __args)
-    {
-        if (_parkLogs++ < 30)
-            LogVerbose($"Puppeteer.Park forever={__args[1]}.");
-    }
 
     private static void PatchSpawnEnemyFinalizer(Harmony harmony)
     {
