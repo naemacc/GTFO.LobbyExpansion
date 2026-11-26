@@ -1,5 +1,6 @@
 using GTFO.LobbyExpansion.Util;
 using HarmonyLib;
+using HarmonyLib.Public.Patching;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -22,6 +23,7 @@ public class ForgeCorePatch : IModCompatibilityPatch
         var pluginInstance = BepInExUtil.GetPluginInstance(PluginGuid);
         var assembly = pluginInstance.GetType().Assembly;
 
+        PatchResolveParserCrash(assembly);
         ExpandStaticPlayerArrays(assembly);
         PatchInstanceConstructors(harmony, assembly);
 
@@ -55,10 +57,8 @@ public class ForgeCorePatch : IModCompatibilityPatch
             }
         }
     }
-#pragma warning restore S3011
 
     // Forge Core constructor reflection is safe because it inspects only array fields whose names match player-slot state.
-#pragma warning disable S3011
     private static void PatchInstanceConstructors(Harmony harmony, Assembly assembly)
     {
         foreach (var type in GetTypes(assembly))
@@ -81,17 +81,16 @@ public class ForgeCorePatch : IModCompatibilityPatch
                 {
                     harmony.Patch(constructor, postfix: new HarmonyMethod(AccessTools.Method(typeof(ForgeCorePatch), nameof(ExpandInstanceArrays_Postfix))));
                 }
-                catch (HarmonyException ex)
+                catch (Exception ex)
                 {
                     L.Warning($"Skipping Forge Core constructor patch for {constructor.DeclaringType?.FullName}: {ex.Message}");
                 }
             }
         }
     }
-#pragma warning restore S3011
+
 
     // Forge Core postfix reflection is safe because it copies existing values and enlarges only player-slot array fields.
-#pragma warning disable S3011
     [HarmonyWrapSafe]
     private static void ExpandInstanceArrays_Postfix(object __instance)
     {
@@ -146,7 +145,14 @@ public class ForgeCorePatch : IModCompatibilityPatch
         if (method is null)
             return;
 
-        harmony.Patch(method, transpiler: new HarmonyMethod(AccessTools.Method(typeof(ForgeCorePatch), transpilerName)));
+        try
+        {
+            harmony.Patch(method, transpiler: new HarmonyMethod(AccessTools.Method(typeof(ForgeCorePatch), transpilerName)));
+        }
+        catch (Exception ex)
+        {
+            L.Warning($"Skipping Forge Core patch for {typeName}.{methodName}: {ex.Message}");
+        }
     }
 
     [HarmonyWrapSafe]
@@ -188,6 +194,45 @@ public class ForgeCorePatch : IModCompatibilityPatch
     private static bool IsCompareOrBranch(OpCode opcode) => opcode == OpCodes.Clt || opcode == OpCodes.Clt_Un
         || opcode == OpCodes.Blt || opcode == OpCodes.Blt_S || opcode == OpCodes.Blt_Un || opcode == OpCodes.Blt_Un_S
         || opcode == OpCodes.Bge || opcode == OpCodes.Bge_S || opcode == OpCodes.Bge_Un || opcode == OpCodes.Bge_Un_S;
+
+    private static EventHandler<PatchManager.PatcherResolverEventArgs>? _forgeResolve;
+
+    // Forge Core's Hooks.Resolve parses every patched method with Il2CppInterop's MiniIlParser, which throws on
+    // opcodes it doesn't know even for plain managed methods. Wrap the handler and swallow only that parser failure.
+    private static void PatchResolveParserCrash(Assembly assembly)
+    {
+        var resolve = GetTypes(assembly)
+            .Where(type => type.Name == "Hooks")
+            .Select(type => AccessTools.Method(type, "Resolve"))
+            .FirstOrDefault(method => method is not null
+                && method.GetParameters() is [_, { ParameterType: var argsType }]
+                && argsType == typeof(PatchManager.PatcherResolverEventArgs));
+
+        if (resolve is null)
+        {
+            L.Warning("Forge Core Hooks.Resolve was not found; patches on methods with unusual IL may still be refused.");
+            return;
+        }
+
+        _forgeResolve = (EventHandler<PatchManager.PatcherResolverEventArgs>)Delegate.CreateDelegate(
+            typeof(EventHandler<PatchManager.PatcherResolverEventArgs>), resolve);
+
+        PatchManager.ResolvePatcher -= _forgeResolve;
+        PatchManager.ResolvePatcher += SafeResolve;
+    }
+
+    private static void SafeResolve(object? sender, PatchManager.PatcherResolverEventArgs args)
+    {
+        try
+        {
+            _forgeResolve!(sender, args);
+        }
+        catch (NotSupportedException ex) when (ex.Message.StartsWith("Unknown opcode", StringComparison.Ordinal)
+            && !typeof(Il2CppInterop.Runtime.InteropTypes.Il2CppObjectBase).IsAssignableFrom(args.Original.DeclaringType))
+        {
+            // MiniIlParser could not read a managed method's IL; it is not a native Il2Cpp hook, so let the patch proceed.
+        }
+    }
 
     private static int GetMaxPlayers() => PluginConfig.MaxPlayers;
 }
