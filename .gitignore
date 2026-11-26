@@ -397,8 +397,12 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
+# Decompiled decompiler reference files
+**/temp/
+
 # ---------------------------------------------------------------------------------------------------------------------
 
 .idea
 GameFolder.props
 /GTFO.LobbyExpansion/GameFolder.props
+/GTFO.LobbyExpansion/temp

@@ -2,7 +2,9 @@ using GTFO.LobbyExpansion.Util;
 using HarmonyLib;
 using SNetwork;
 using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Security.Cryptography;
 
 namespace GTFO.LobbyExpansion.Compatibility;
@@ -196,7 +198,44 @@ public class LocaliaCorePatch : IModCompatibilityPatch
         PatchMethod(harmony, _apiType, "has_got_modlist", nameof(API__has_got_modlist__Prefix));
         PatchMethod(harmony, _apiType, "has_Everyone_Install_Plugin", nameof(API__has_Everyone_Install_Plugin__Prefix));
 
+        var removePlayerPatch = ReflectionUtil.GetRequiredTypeByName("Patch_RemovePlayerFromSession", _networkManagerType!.Assembly);
+        var removePlayerPrefix = AccessTools.Method(removePlayerPatch, "Prefix")
+            ?? throw new MissingMethodException($"Unable to find {removePlayerPatch.FullName}::Prefix().");
+        harmony.Patch(removePlayerPrefix, transpiler: new HarmonyMethod(AccessTools.Method(typeof(LocaliaCorePatch), nameof(SafeSlotLookup_Transpiler))));
+
         L.Debug($"Applied patches in {nameof(LocaliaCorePatch)}.");
+    }
+
+    [HarmonyWrapSafe]
+    private static IEnumerable<CodeInstruction> SafeSlotLookup_Transpiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var codes = new List<CodeInstruction>(instructions);
+        var safeLookup = AccessTools.Method(typeof(LocaliaCorePatch), nameof(SafeSlotLookup))!;
+        var replacements = 0;
+
+        foreach (var instruction in codes)
+        {
+            if (instruction.opcode != OpCodes.Ldelem_I8)
+                continue;
+
+            instruction.opcode = OpCodes.Call;
+            instruction.operand = safeLookup;
+            replacements++;
+        }
+
+        if (replacements != 1)
+            throw new InvalidOperationException($"Expected one slot lookup in LocaliaCore's remove-player prefix, found {replacements}.");
+
+        return codes;
+    }
+
+    private static ulong SafeSlotLookup(ulong[] slots, int slot)
+    {
+        if ((uint)slot < (uint)slots.Length)
+            return slots[slot];
+
+        L.Warning($"LocaliaCore attempted to clear out-of-range player slot {slot}; skipping only its slot lookup.");
+        return 0;
     }
 
     private static void PatchMethod(Harmony harmony, Type? targetType, string methodName, string prefixName)
