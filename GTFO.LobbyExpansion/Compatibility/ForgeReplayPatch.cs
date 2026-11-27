@@ -1273,7 +1273,7 @@ public class ForgeReplayPatch : IModCompatibilityPatch
         || opcode == OpCodes.Ble || opcode == OpCodes.Ble_S || opcode == OpCodes.Ble_Un || opcode == OpCodes.Ble_Un_S
         || opcode == OpCodes.Bgt || opcode == OpCodes.Bgt_S || opcode == OpCodes.Bgt_Un || opcode == OpCodes.Bgt_Un_S;
 
-    private const int CardsPerPage = 8;
+    private const int CardsPerPage = 4;
     private static MethodInfo? _followGetter;
     private static FieldInfo? _inRecordingField;
     private static int _cardPageFrame = -1;
