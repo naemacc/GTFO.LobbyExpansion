@@ -4,6 +4,7 @@ using GTFO.LobbyExpansion.Util;
 namespace GTFO.LobbyExpansion.Patches.Manual;
 
 #pragma warning disable S101
+
 public class CM_PageMapManualPatch : ManualPatch
 {
     protected override Type TargetType { get; } = typeof(CM_PageMap);

@@ -51,6 +51,9 @@ public class ForgeReplayPatch : IModCompatibilityPatch
         PatchDirector(harmony, assembly);
         PatchReplayMetadata(harmony, assembly, replayScreen, runReport, analysis);
 
+        // Optional extras for players 5+. Runs last and is fully isolated: a failure here can never abort the core patch above.
+        PatchOptionalExtras(harmony, assembly);
+
         LogVerbose("END verbose patch details.");
         L.Info($"[{nameof(ForgeReplayPatch)}] Compatibility patch applied.");
     }
@@ -1476,6 +1479,112 @@ public class ForgeReplayPatch : IModCompatibilityPatch
 
     private static Exception? SpawnEnemy_Finalizer(Exception? __exception)
         => __exception is not null && __exception.ToString().Contains("TumorShadowFix", StringComparison.Ordinal) ? null : __exception;
+
+    // ------------------------------------------------------------------------------------------------
+    // Optional extras (Forge Replay 1.0.3). Every step is wrapped, so a failure only skips that step.
+    // ------------------------------------------------------------------------------------------------
+    private static void PatchOptionalExtras(Harmony harmony, Assembly assembly)
+    {
+        Optional("stackalloc player spans", () =>
+        {
+            PatchMethodSafe(harmony, ReflectionUtil.GetRequiredTypeByName("Director", assembly), "Choose", nameof(StackallocPlayerSpan_Transpiler));
+            PatchMethodSafe(harmony, ReflectionUtil.GetRequiredTypeByName("HitMatch", assembly), "Match", nameof(StackallocPlayerSpan_Transpiler));
+        });
+
+        Optional("Analysis loops / slot guards", () =>
+        {
+            var analysis = ReflectionUtil.GetRequiredTypeByName("Analysis", assembly);
+            foreach (var name in new[] { "Take", "Wiped", "Rescued", "NearestPlayer" })
+                PatchPlayerBounds(harmony, analysis, name);
+            PatchMethodSafe(harmony, analysis, "EstimateStruck", nameof(SlotUpperBound_Transpiler));
+            PatchSlotMasks(harmony, analysis, "EstimateShot");
+            // NOTE: Analysis.Run intentionally NOT given SlotUpperBound - it caused "IL Compile Error" in testing.
+        });
+
+        Optional("ClientInference loops / slot guards", () =>
+        {
+            var inference = ReflectionUtil.GetRequiredTypeByName("ClientInference", assembly);
+            foreach (var name in new[] { "Woke", "Reviver", "Retracted" })
+                PatchPlayerBounds(harmony, inference, name);
+            PatchPlayerBoundsAllOverloads(harmony, inference, "Settle"); // Settle(Drop) / Settle(Wakeup) are overloaded
+            PatchSlotMasks(harmony, inference, "Take");
+            PatchMethodSafe(harmony, inference, "Take", nameof(SlotUpperBound_Transpiler));
+            PatchMethodSafe(harmony, inference, "Retracted", nameof(SlotUpperBound_Transpiler));
+        });
+
+        Optional("director result >= 4", () =>
+            PatchPlayerBounds(harmony, ReflectionUtil.GetRequiredTypeByName("ReplayScreen", assembly), "Tick"));
+
+        Optional("spectate / first-person slot masks", () =>
+        {
+            PatchSlotMasks(harmony, ReflectionUtil.GetRequiredTypeByName("Puppeteer", assembly), "SyncPlayers");
+            var firstPerson = ReflectionUtil.GetRequiredTypeByName("FirstPerson", assembly);
+            foreach (var name in new[] { "Frame", "Sway", "Keep", "Event", "Charge" })
+                PatchSlotMasks(harmony, firstPerson, name);
+        });
+    }
+
+    private static void Optional(string label, Action step)
+    {
+        try
+        {
+            step();
+        }
+        catch (Exception ex)
+        {
+            LogWarning($"Skipping optional patch '{label}': {ex.GetType().Name}: {ex.InnerException?.Message ?? ex.Message}");
+        }
+    }
+
+    private static void PatchPlayerBoundsAllOverloads(Harmony harmony, Type type, string methodName)
+    {
+        var transpiler = new HarmonyMethod(AccessTools.Method(typeof(ForgeReplayPatch), nameof(PlayerBounds_Transpiler)));
+        var found = 0;
+        foreach (var method in AccessTools.GetDeclaredMethods(type).Where(m => m.Name == methodName))
+        {
+            harmony.Patch(method, transpiler: transpiler);
+            found++;
+        }
+
+        if (found == 0)
+            LogWarning($"Skipping Forge Replay PlayerBounds patch for {type.FullName}::{methodName}(): method not found.");
+    }
+
+    // Replaces stackalloc T[4] sizing and the Span<T> length with the configured player capacity.
+    // stackalloc of a 4-byte element x4 compiles to: ldc.i4.s 16 ; conv.u ; localloc ; ldc.i4.4 ; newobj Span<T>(void*, int)
+    [HarmonyWrapSafe]
+    private static IEnumerable<CodeInstruction> StackallocPlayerSpan_Transpiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var getMax = AccessTools.Method(typeof(ForgeReplayPatch), nameof(GetMaxPlayers));
+        var codes = new List<CodeInstruction>(instructions);
+        var found = 0;
+
+        for (var i = 0; i < codes.Count - 4; i++)
+        {
+            if (!codes[i].LoadsConstant(16)
+                || codes[i + 1].opcode != OpCodes.Conv_U
+                || codes[i + 2].opcode != OpCodes.Localloc
+                || codes[i + 3].opcode != OpCodes.Ldc_I4_4
+                || codes[i + 4].opcode != OpCodes.Newobj
+                || codes[i + 4].operand is not ConstructorInfo { DeclaringType: { IsGenericType: true } spanType }
+                || spanType.GetGenericTypeDefinition() != typeof(Span<>))
+                continue;
+
+            codes[i + 3].opcode = OpCodes.Call;   // span length = MaxPlayers
+            codes[i + 3].operand = getMax;
+            codes[i].opcode = OpCodes.Call;       // byte size = MaxPlayers * 4
+            codes[i].operand = getMax;
+            codes.Insert(i + 1, new CodeInstruction(OpCodes.Ldc_I4_4));
+            codes.Insert(i + 2, new CodeInstruction(OpCodes.Mul));
+            found++;
+            break;
+        }
+
+        if (found != 1)
+            throw new InvalidOperationException($"Expected one stackalloc player span, found {found}.");
+
+        return codes;
+    }
 
     private static int GetMaxPlayers() => PluginConfig.MaxPlayers;
 
