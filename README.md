@@ -1,63 +1,121 @@
 # GTFO LobbyExpansion (Fork)
 
 > [!NOTE]
-> The original repository for this mod appears to be dead/abandoned. This is **not** an official continuation or a new maintainer's revival, but rather a personalized fork created to keep the mod working smoothly alongside other popular community mods.
+> The original repository for this mod appears to be abandoned. This fork is a personalized compatibility build for current GTFO community mods; it is not an official continuation or a managed revival of the upstream project.
 
 ## Branch Information
 
-- **`personalized` (Default):** Contains all the custom compatibility patches, bug fixes, and additions.
-- **`master`:** The original state of the upstream repository, preserved just in case it is ever needed for reference.
-- **`compatibility-patches` :** Old PR branch to the original repository.
-- **`Build-14562266`:** Same as personalized but for older build 14562266 prior the security update.
+- **`personalized` (default):** The actively maintained branch with current compatibility patches, bug fixes, and configuration support.
+- **`Build-14562266`:** Maintains compatibility with GTFO build `14562266`, before the later game security/update changes.
+- **`master`:** The original upstream repository state, preserved for reference.
 
----
+Release and build configuration can output branch-specific DLLs under the build output directory. Use the artifact for your GTFO build branch, not the DLL from the wrong build line.
 
-## What's New in This Fork?
+## Features
 
-This fork introduces several new Harmony patches to support lobbies with 5+ players across various community mods, fixing hardcoded limits and preventing crashes.
+LobbyExpansion expands the lobby and in-game player support beyond the vanilla four-slot assumptions. The default configured capacity is **8 players**, and custom counts must be at least **4**.
 
-### Fixes
+### Lobby and UI
 
-- **ChatterReborn Compatibility** _(Credit to Dinorush for a large part of the original fix)_
-  - **Dynamic array sizing:** Replaces hardcoded loops (`for (int i = 0; i < 4; i++)`) to process all player slots correctly, preventing the mod from leaving stale detection/aggro scores behind for players 5+.
-  - **Transpiler Fix:** Resolves an `IndexOutOfRangeException` when ordering a 5th+ player back to a bioscan by dynamically swapping `ldc.i4.4` to call `GetMaxPlayersAsInt()`.
-  - **Error Handling & Fallbacks:** Exceptions during patch application now throw loudly instead of failing silently. Added late-initialization array fix-ups in case ChatterReborn's `Setup()` or `Awake()` runs before the patch applies.
-- **OptionalNetworkAPI Compatibility**
-  - **Stale Bot Entry Fix:** Resolves an `ArgumentException` loop that occurs when bots attempt to rejoin a lobby. If a bot's removal is interrupted by another mod's bug, OptionalNetworkAPI leaves a stale dictionary entry forever since bots don't trigger normal network disconnect events. The patch actively clears pre-existing dictionary entries for bots before `OnAddPlayer` runs.
+- Expands lobby, loadout, expedition, elevator, map, compass, player-card, coverage, voice, and network slot handling for additional players.
+- Adds player pagination and dynamic lobby/list layouts where game or mod UI code assumes only four slots.
+- Applies manual and Harmony patches for both elevated lobby displays and runtime player/session systems.
+- Keeps extra-slot bot permissions, bot names, and bioscan labels configurable.
+- Includes fixes for elevator/cage/ride seating, stale player state, player cards, and 5+ player coverage or scanner behavior.
 
-### Additions
+### Forge Compatibility
 
-- **ExtraObjectiveSetup / ECPC Compatibility** _(Salvaged from upstream PR #3)_
-  - Added a Harmony patch to fix the ECPC T scan. Because ECPC sometimes kills the coroutine, this patch safely suppresses the call. The implementation was adapted directly from the core to ensure stability.
-- **LocaliaCore Compatibility**
-  - Expanded `Network_Manager` static arrays (previously hardcoded to length 4) to support `MaxPlayers`, preventing crashes and corrupted slot-index bookkeeping.
-  - Patched hardcoded loop bounds (0..3) in `LocaliaCore_Moniter.FixedUpdate()` and `Network_Manager.outLobbyClear()`.
-  - Patched bounds checks in API methods (`is_Valid_Human`, `has_got_modlist`, `has_Everyone_Install_Plugin`) to ensure public modlist synchronization works correctly for expanded lobbies.
-- **ModList Compatibility**
-  - Expanded the `UI_ModButtons` array initialization to support `MaxPlayers`.
-  - Added safe IL transpilers to replace hardcoded loop bounds in `GenerateLobbyButtons`, `checkSlotState`, and `ClearButtonText` with a dynamic cap. This ensures players 5+ properly receive their mod-sync UI labels on the lobby screen.
-- **PingConsumables Compatibility**
-  - Patched BepInEx's `DiskLogListener.LogEvent` specifically scoped to PingConsumables' own logger instance. Safely intercepts and suppresses spammy recurring housekeeping logs (from `MovePickups` and `RemoveConsumablesFromTerminal` coroutines) before they write to the disk, keeping the console log clean without breaking the mod's useful one-time initialization info logs.
-- **PlayerSync Compatibility**
-  - Added a null check guard for StaminaSync packets. Drops packets safely if the sender is null (e.g., when a packet is in-flight for a player mid-leave/rejoin), mirroring existing behavior in AmmoSync and preventing native-to-managed trampoline crashes.
-- **ZombifiedInitiative Compatibility**
-  - **Orphaned Component Guard:** Prevents a continuous `NullReferenceException` loop in `ZombieComp.Update()` if a bot's `PlayerAgent` is destroyed by another mod's player removal bug.
-  - **Sentry Mode Networking:** Fixed a feature gap where the "sentry mode" bot command wasn't networked when issued by a non-host client. Snapshots the `allowedmove` flag and forwards the toggle to the host using an unused `ZINetInfo.FUNC` ID (6), resetting `DescBase.Status` so bots can successfully un-stick and resume movement later.
+- **Forge Core:** Expands static and instance player-slot arrays, patches hardcoded four-player loops, and guards known parser-crash paths.
+- **Forge Replay:** Expands replay rosters and player arrays to `MaxPlayers`, including player cards, statistics, ratings, team tables, analysis, reports, director behavior, first-person/spectate presentation, snapshot/body state, and optional player-scope methods.
+- Replaces hardcoded replay bounds and stack/array allocations with configured player capacity while preserving separate enemy entity-ID ranges.
+- Supports replay card pagination and initializes newly exposed player-stat/series/radar structures instead of leaving null or undersized elements (Switching pass the 4th card will switch cards page).
 
----
+### Community Mod Compatibility
+
+| Mod | Compatibility provided |
+|---|---|
+| ChatterReborn | Resizes per-player and enemy detection arrays, updates 4-player loops, supports late initialization, and prevents stale 5+ player aggro/detection state. _(Dinorush provided a large part of the original fix.)_ |
+| OptionalNetworkAPI | Clears stale bot dictionary entries before player-add handling, preventing rejoin loops and `ArgumentException` failures. |
+| LocaliaCore | Expands `Network_Manager` arrays and loops, fixes slot bounds and public mod-sync checks, and updates player monitor behavior. |
+| PacksHelper | Resizes PacksHelper's static health, gear, tool, and information arrays for the configured lobby size. |
+| ModList | Expands mod-button storage and updates exact loop bounds so 5+ players receive lobby mod-sync labels. |
+| ConflictModList | Expands the lobby-seat array in `LobbyNetworkHud` when the third-party mod's seat HUD is smaller than the configured lobby. |
+| PingConsumables | Suppresses only recurring PingConsumables housekeeping log events while preserving useful initialization logging. |
+| PlayerSync | Guards null stamina-sync senders to prevent native-to-managed crashes for players leaving or rejoining. |
+| ZombifiedInitiative | Guards orphaned zombie components and forwards non-host sentry-mode commands to the host using the mod's networking protocol. |
+| ExtraObjectiveSetup / ECPC | Includes the salvaged ECPC T-scan coroutine guard for the `ECC_CompatibilityPatch`. |
+
+Compatibility patches are optional and activate only when the matching plugin GUID is loaded. Missing or incompatible optional mods do not prevent the core LobbyExpansion patches from loading.
+
+## Configuration
+
+Configuration is loaded from BepInEx's configured `ConfigPath`.
+
+### Player count
+
+Create or edit:
+
+```text
+BepInEx/config/LobbyExpansionConfig.json
+```
+
+```json
+{
+  "MaxPlayers": 8
+}
+```
+
+- `MaxPlayers` defaults to `8`.
+- Values below `4` fall back to the default and are logged as invalid.
+- The custom player count is used by core patches and supported compatibility patches.
+
+### User data
+
+Lobby slots, bot names, and bioscan labels are stored separately at:
+
+```text
+BepInEx/config/LobbyExpansionConfig_UserData.json
+```
+
+The file is created automatically with defaults. Its supported fields are:
+
+```json
+{
+  "SlotPermissions": {},
+  "CustomExtraBotNames": [],
+  "BioscanLetters": ["A", "B", "C", "D", "E", "F", "G", "H"]
+}
+```
+
+- `SlotPermissions` saves permissions for extra lobby slots.
+- `CustomExtraBotNames` replaces default names for slots 5 and onward.
+- `BioscanLetters` supplies custom labels for bioscan interfaces.
+
+Missing user-data fields are restored to safe defaults at startup. The configured bioscan-letter list is extended as needed for extra slots.
 
 ## How to Install
 
-Pre-compiled releases are available on the [Releases](https://github.com/naemacc/GTFO.LobbyExpansion/releases/latest) page.
+Pre-compiled releases are available on the [Releases page](https://github.com/naemacc/GTFO.LobbyExpansion/releases/latest).
 
-1. Ensure you have a working GTFO BepInEx setup (such as **BepInExPack_GTFO**) installed in your game directory.
-2. Make sure the mods you are patching (ChatterReborn, LocaliaCore, etc.) are installed and up to date.
-3. Download the latest `.dll` file from the **Releases** tab on this repository.
-4. Drop the downloaded `.dll` into your `GTFO/BepInEx/plugins` folder (or into the `BepInEx/plugins` folder of your mod manager profile, such as r2modman).
-5. Launch the game to apply the patches.
+1. Install GTFO BepInEx.
+2. Install any optional community mods you want this mod to patch.
+3. Download the compressed `.dll` for the matching GTFO branch/build and extract it.
+4. Place the DLL in `BepInEx/plugins` (or in the mod-manager profile's plugin folder).
+5. Launch the game. Optional compatibility patches are selected from the plugins currently loaded at startup.
+
+## Building
+
+The project is a `.NET 6` IL2CPP/BepInEx mod targeting `net6.0-windows` and `x64`.
+
+Set `GameFolder` to the GTFO game directory in `GameFolder.props`. A build can then:
+
+- copy the output automatically to `BepInEx/plugins` when `CopyToPluginFolder` is enabled;
+- append the current Git branch to the build/target output path;
+- produce Debug or Release builds for the repository's branch-specific setup.
 
 ## Credits
 
-- The original LobbyExpansion author(s).
-- **Dinorush** for the foundational ChatterReborn fix.
-- The original author of the salvaged ECPC patch PR.
+- The original LobbyExpansion authors.
+- **Dinorush** for the foundational ChatterReborn compatibility work.
+- Community mod authors and maintainers whose plugins are detected and patched by this fork.
+- The original authors of salvaged compatibility patches preserved in this repository.
