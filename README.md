@@ -38,8 +38,7 @@ LobbyExpansion expands the lobby and in-game player support beyond the vanilla f
 | OptionalNetworkAPI | Clears stale bot dictionary entries before player-add handling, preventing rejoin loops and `ArgumentException` failures. |
 | LocaliaCore | Expands `Network_Manager` arrays and loops, fixes slot bounds and public mod-sync checks, and updates player monitor behavior. |
 | PacksHelper | Resizes PacksHelper's static health, gear, tool, and information arrays for the configured lobby size. |
-| ModList | Expands mod-button storage and updates exact loop bounds so 5+ players receive lobby mod-sync labels. |
-| ConflictModList | Expands the lobby-seat array in `LobbyNetworkHud` when the third-party mod's seat HUD is smaller than the configured lobby. |
+| ModList | Expands mod-button storage and exact loop bounds for 5+ players, compares host mod versions, and shows live latency in lobby mod-sync labels. The separate ConflictModList compatibility patch is no longer needed. |
 | PingConsumables | Suppresses only recurring PingConsumables housekeeping log events while preserving useful initialization logging. |
 | PlayerSync | Guards null stamina-sync senders to prevent native-to-managed crashes for players leaving or rejoining. |
 | ZombifiedInitiative | Guards orphaned zombie components and forwards non-host sentry-mode commands to the host using the mod's networking protocol. |

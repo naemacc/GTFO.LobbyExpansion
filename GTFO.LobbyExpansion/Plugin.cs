@@ -17,7 +17,6 @@ namespace GTFO.LobbyExpansion;
 [BepInDependency(ModListPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(PingConsumablesPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(OptionalNetworkAPIPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
-[BepInDependency(ConflictModListPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(ForgeCorePatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 [BepInDependency(ForgeReplayPatch.PluginGuid, BepInDependency.DependencyFlags.SoftDependency)]
 public class Plugin : BasePlugin
@@ -119,7 +118,6 @@ public class Plugin : BasePlugin
             ModListPatch.Instance,
             PingConsumablesPatch.Instance,
             OptionalNetworkAPIPatch.Instance,
-            ConflictModListPatch.Instance,
             ForgeCorePatch.Instance,
             ForgeReplayPatch.Instance,
         };
